@@ -59,7 +59,7 @@ class PlayerHandler:
                 "• 精神力：100-500\n\n"
                 "【体修】以气血为主，肉身强横\n"
                 "• 寿命：50-100\n"
-                "• HP：100-500\n"
+                "• 气血：100-500\n"
                 "• 法伤：0\n"
                 "• 物伤：100-500\n"
                 "• 法防：50-200\n"
@@ -186,7 +186,7 @@ class PlayerHandler:
             f"  修炼方式：{player.cultivation_type}\n"
             f"  状态：{player.state}\n"
             f"  寿命：{player.lifespan}\n"
-            f"  气血：{player.hp}/{int(player.experience // 2)}\n"
+            f"  HP：{player.hp}/{int(player.experience // 2)}\n"
             f"  精神力：{total_attrs['mental_power']}\n"
         )
         
