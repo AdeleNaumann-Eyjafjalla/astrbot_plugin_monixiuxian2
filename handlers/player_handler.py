@@ -168,6 +168,12 @@ class PlayerHandler:
         # 构建信息显示
         dao_hao = player.user_name if player.user_name else display_name
         
+        # 从 UserCd 推导实际状态（因为 player.state 只在闭关时更新，其他活动只更新 UserCd）
+        actual_state = player.state
+        user_cd = await self.db.ext.get_user_cd(player.user_id)
+        if user_cd and user_cd.type != UserStatus.IDLE:
+            actual_state = UserStatus.get_name(user_cd.type)
+        
         reply_msg = (
             f"📋 道友 {dao_hao} 的信息\n"
             f"━━━━━━━━━━━━━━━\n"
@@ -183,7 +189,7 @@ class PlayerHandler:
             f"\n"
             f"【修炼属性】\n"
             f"  修炼方式：{player.cultivation_type}\n"
-            f"  状态：{player.state}\n"
+            f"  状态：{actual_state}\n"
             f"  寿命：{player.lifespan}\n"
             f"  HP：{player.hp}/{int(player.experience // 2)}\n"
             f"  精神力：{total_attrs['mental_power']}\n"

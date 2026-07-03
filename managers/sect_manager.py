@@ -4,6 +4,7 @@
 参照NoneBot2插件的xiuxian_sect实现
 """
 
+import json
 import random
 import time
 from typing import Tuple, List, Optional, Dict
@@ -487,17 +488,22 @@ class SectManager:
         if not player or player.sect_id == 0:
             return False, "❌ 你还未加入宗门！"
             
-        # 检查CD (使用宗门任务CD类型，假设为4)
+        # 检查CD：宗门任务是瞬时的，冷却时间存在 extra_data 而非设为忙碌状态
         user_cd = await self.db.ext.get_user_cd(user_id)
         if not user_cd:
             await self.db.ext.create_user_cd(user_id)
             user_cd = await self.db.ext.get_user_cd(user_id)
             
         current_time = int(time.time())
-        # 假设 CD 记录在 type=4, scheduled_time 为下次可用时间
-        # 这里重用 set_user_busy 逻辑，但任务通常是瞬时的，只设冷却
-        if user_cd.type == UserStatus.SECT_TASK and current_time < user_cd.scheduled_time:
-            remaining = user_cd.scheduled_time - current_time
+        
+        # 从 extra_data 读取上一次任务冷却时间
+        try:
+            extra = json.loads(user_cd.extra_data) if user_cd.extra_data else {}
+        except (json.JSONDecodeError, TypeError):
+            extra = {}
+        sect_task_cd = extra.get("sect_task_cd", 0)
+        if current_time < sect_task_cd:
+            remaining = sect_task_cd - current_time
             return False, f"❌ 宗门任务冷却中！还需 {remaining//60} 分钟。"
 
         # 执行任务
@@ -505,6 +511,8 @@ class SectManager:
         stone_gain = contribution_gain * 10
         
         player.sect_contribution += contribution_gain
+        # 增加每日任务完成次数
+        player.sect_task += 1
         await self.db.update_player(player)
         
         # 手动更新宗门资源
@@ -513,10 +521,12 @@ class SectManager:
             sect.sect_materials += stone_gain
             await self.db.ext.update_sect(sect)
 
-        # 设置1小时冷却
-        await self.db.ext.set_user_busy(user_id, 4, current_time + 3600)
+        # 记录1小时任务冷却到 extra_data，不改变 busy 状态
+        extra["sect_task_cd"] = current_time + 3600
+        user_cd.extra_data = json.dumps(extra, ensure_ascii=False)
+        await self.db.ext.update_user_cd(user_cd)
         
-        return True, f"✨ 完成宗门任务！\n获得贡献：{contribution_gain}\n宗门资材：+{stone_gain}"
+        return True, f"✨ 完成宗门任务！\n获得贡献：{contribution_gain}\n宗门资材：+{stone_gain}\n今日任务次数：{player.sect_task}"
 
     async def handle_owner_death(self, sect_id: int, dead_owner_id: str) -> Tuple[bool, str]:
         """处理宗主死亡，自动传位或解散宗门"""
