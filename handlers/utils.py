@@ -84,13 +84,21 @@ def player_required(func: Callable[..., Coroutine[any, any, AsyncGenerator[any, 
         # 检查 user_cd 表的忙碌状态
         user_cd = await self.db.ext.get_user_cd(player.user_id)
         if user_cd and user_cd.type != UserStatus.IDLE:
-            # 玩家处于忙碌状态，检查命令是否在白名单中
-            is_allowed = _is_command_allowed(message_text, BUSY_STATE_ALLOWED_COMMANDS)
-            
-            if not is_allowed:
-                status_name = UserStatus.get_name(user_cd.type)
-                yield event.plain_result(f"道友当前正在「{status_name}」，无法分心他顾。\n💡 可使用「我的信息」「签到」「银行」等基础指令。")
-                return
+            current_time = int(time.time())
+            # v3.2.1 自愈：宗门任务是瞬时的，type=4 的旧数据无条件清除
+            if user_cd.type == UserStatus.SECT_TASK:
+                user_cd.type = UserStatus.IDLE
+                user_cd.scheduled_time = 0
+                user_cd.extra_data = None
+                await self.db.ext.update_user_cd(user_cd)
+            else:
+                # 玩家处于忙碌状态，检查命令是否在白名单中
+                is_allowed = _is_command_allowed(message_text, BUSY_STATE_ALLOWED_COMMANDS)
+                
+                if not is_allowed:
+                    status_name = UserStatus.get_name(user_cd.type)
+                    yield event.plain_result(f"道友当前正在「{status_name}」，无法分心他顾。\n💡 可使用「我的信息」「签到」「银行」等基础指令。")
+                    return
         
         # 状态检查：如果处于修炼中（闭关），只允许出关、查看信息和签到
         if player.state == "修炼中":
