@@ -268,7 +268,7 @@ class CultivationManager:
         return descriptions.get(root_name, "【未知】神秘的灵根")
 
     def generate_new_player_stats(self, user_id: str, cultivation_type: str = "灵修") -> Player:
-        """生成新玩家的初始数据
+        """生成新玩家的初始数据（从境界配置读取基础属性，附加少量随机波动）
 
         Args:
             user_id: 用户ID
@@ -279,44 +279,50 @@ class CultivationManager:
         root = self._get_random_spiritual_root()
         initial_gold = self.config["VALUES"]["INITIAL_GOLD"]
 
-        if cultivation_type == "灵修":
-            # 灵修初始数据：寿命100，修为0，灵气100-1000，法伤5-100，物伤5，法防0，物防5，精神力100-500
-            return Player(
-                user_id=user_id,
-                spiritual_root=f"{root}灵根",
-                cultivation_type="灵修",
-                lifespan=100,
-                experience=0,
-                gold=initial_gold,
-                spiritual_qi=random.randint(100, 1000),
-                max_spiritual_qi=random.randint(100, 1000),
-                blood_qi=0,
-                max_blood_qi=0,
-                magic_damage=random.randint(5, 100),
-                physical_damage=5,
-                magic_defense=0,
-                physical_defense=5,
-                mental_power=random.randint(100, 500)
-            )
-        else:  # 体修
-            # 体修初始数据：寿命50-100，修为0，气血100-500，法伤0，物伤100-500，法防50-200，物防100-500，精神力100-500
-            initial_blood_qi = random.randint(100, 500)
+        # 从境界配置读取 level_index=0 的基础属性
+        base = self._calculate_base_stats(0, cultivation_type)
+
+        # 随机波动系数：0.5 ~ 1.5
+        def _rand_var(stat: int) -> int:
+            return max(1, int(stat * random.uniform(0.5, 1.5)))
+
+        if cultivation_type == "体修":
+            initial_blood_qi = _rand_var(base["max_blood_qi"])
             return Player(
                 user_id=user_id,
                 spiritual_root=f"{root}灵根",
                 cultivation_type="体修",
-                lifespan=random.randint(50, 100),
+                lifespan=_rand_var(base["lifespan"]),
                 experience=0,
                 gold=initial_gold,
                 spiritual_qi=0,
                 max_spiritual_qi=0,
                 blood_qi=initial_blood_qi,
                 max_blood_qi=initial_blood_qi,
-                magic_damage=0,
-                physical_damage=random.randint(100, 500),
-                magic_defense=random.randint(50, 200),
-                physical_defense=random.randint(100, 500),
-                mental_power=random.randint(100, 500)
+                magic_damage=random.randint(0, 5),
+                physical_damage=_rand_var(base["physical_damage"]),
+                magic_defense=_rand_var(base["magic_defense"]),
+                physical_defense=_rand_var(base["physical_defense"]),
+                mental_power=_rand_var(base["mental_power"])
+            )
+        else:  # 灵修
+            initial_spiritual_qi = _rand_var(base["max_spiritual_qi"])
+            return Player(
+                user_id=user_id,
+                spiritual_root=f"{root}灵根",
+                cultivation_type="灵修",
+                lifespan=_rand_var(base["lifespan"]),
+                experience=0,
+                gold=initial_gold,
+                spiritual_qi=initial_spiritual_qi,
+                max_spiritual_qi=initial_spiritual_qi,
+                blood_qi=0,
+                max_blood_qi=0,
+                magic_damage=_rand_var(base["magic_damage"]),
+                physical_damage=random.randint(0, 5),
+                magic_defense=_rand_var(base["magic_defense"]),
+                physical_defense=_rand_var(base["physical_defense"]),
+                mental_power=_rand_var(base["mental_power"])
             )
 
     def get_spiritual_root_speed(self, player: Player) -> float:
@@ -345,7 +351,7 @@ class CultivationManager:
     def calculate_cultivation_exp(
         self,
         player: Player,
-        minutes: int,
+        minutes: float,
         technique_bonus: float = 0.0,
         pill_multipliers: Optional[Dict[str, float]] = None
     ) -> int:
@@ -353,7 +359,7 @@ class CultivationManager:
 
         Args:
             player: 玩家对象
-            minutes: 闭关时长（分钟）
+            minutes: 闭关时长（分钟，支持浮点）
             technique_bonus: 心法提供的修为倍率加成（来自主修心法的exp_multiplier）
 
         Returns:

@@ -193,36 +193,40 @@ class EquipmentManager:
         # 根据物品类型装备到相应位置
         if item.item_type == "weapon":
             old_item = player.weapon
+            # 先尝试将旧装备存入储物戒，再更新玩家装备
+            storage_msg = ""
+            if old_item:
+                success, store_msg = await self.storage_ring_manager.store_item(player, old_item, 1, silent=True) if self.storage_ring_manager else (True, "")
+                if not success:
+                    return False, f"储物戒空间不足，无法替换装备！\n旧装备【{old_item}】存入失败：{store_msg}"
+                storage_msg = f"\n旧装备【{old_item}】已存入储物戒"
             player.weapon = item.name
             await self.db.update_player(player)
-            if old_item:
-                # 尝试将旧装备存入储物戒
-                storage_msg = await self._store_old_equipment(player, old_item)
-                return True, f"已将【{old_item}】替换为【{item.name}】（{item.rank}）{storage_msg}"
-            else:
-                return True, f"已装备武器【{item.name}】（{item.rank}）"
+            return True, f"已将【{old_item or '空'}】替换为【{item.name}】（{item.rank}）{storage_msg}" if old_item else f"已装备武器【{item.name}】（{item.rank}）"
 
         elif item.item_type == "armor":
             old_item = player.armor
+            storage_msg = ""
+            if old_item:
+                success, store_msg = await self.storage_ring_manager.store_item(player, old_item, 1, silent=True) if self.storage_ring_manager else (True, "")
+                if not success:
+                    return False, f"储物戒空间不足，无法替换装备！\n旧装备【{old_item}】存入失败：{store_msg}"
+                storage_msg = f"\n旧装备【{old_item}】已存入储物戒"
             player.armor = item.name
             await self.db.update_player(player)
-            if old_item:
-                # 尝试将旧装备存入储物戒
-                storage_msg = await self._store_old_equipment(player, old_item)
-                return True, f"已将【{old_item}】替换为【{item.name}】（{item.rank}）{storage_msg}"
-            else:
-                return True, f"已装备防具【{item.name}】（{item.rank}）"
+            return True, f"已将【{old_item or '空'}】替换为【{item.name}】（{item.rank}）{storage_msg}" if old_item else f"已装备防具【{item.name}】（{item.rank}）"
 
         elif item.item_type == "main_technique":
             old_item = player.main_technique
+            storage_msg = ""
+            if old_item:
+                success, store_msg = await self.storage_ring_manager.store_item(player, old_item, 1, silent=True) if self.storage_ring_manager else (True, "")
+                if not success:
+                    return False, f"储物戒空间不足，无法替换装备！\n旧装备【{old_item}】存入失败：{store_msg}"
+                storage_msg = f"\n旧装备【{old_item}】已存入储物戒"
             player.main_technique = item.name
             await self.db.update_player(player)
-            if old_item:
-                # 尝试将旧心法存入储物戒
-                storage_msg = await self._store_old_equipment(player, old_item)
-                return True, f"已将主修心法【{old_item}】替换为【{item.name}】（{item.rank}）{storage_msg}"
-            else:
-                return True, f"已装备主修心法【{item.name}】（{item.rank}）"
+            return True, f"已将主修心法【{old_item or '空'}】替换为【{item.name}】（{item.rank}）{storage_msg}" if old_item else f"已装备主修心法【{item.name}】（{item.rank}）"
 
         elif item.item_type == "technique":
             techniques_list = player.get_techniques_list()

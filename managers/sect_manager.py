@@ -189,9 +189,11 @@ class SectManager:
         
         sect_name = sect.sect_name if sect else "未知宗门"
         
-        # 清除宗门信息
-        await self.db.ext.update_player_sect_info(user_id, 0, 4)
+        # 清除宗门信息（先同步 player 对象，避免 update_player 覆盖 DB 独立提交）
+        player.sect_id = 0
+        player.sect_position = 4
         player.sect_contribution = 0
+        await self.db.ext.update_player_sect_info(user_id, 0, 4)
         await self.db.update_player(player)
         
         return True, f"✨ 你已退出宗门『{sect_name}』！"
@@ -461,10 +463,12 @@ class SectManager:
         if target.sect_position == 0:
             return False, "❌ 无法踢出宗主！"
         
-        # 踢出
+        # 踢出（先同步 target 对象，避免 update_player 覆盖 DB 独立提交）
         target_name = target.user_name if target.user_name else target_id
-        await self.db.ext.update_player_sect_info(target_id, 0, 4)
+        target.sect_id = 0
+        target.sect_position = 4
         target.sect_contribution = 0
+        await self.db.ext.update_player_sect_info(target_id, 0, 4)
         await self.db.update_player(target)
         
         return True, f"✨ 已将 {target_name} 踢出宗门！"
@@ -503,8 +507,6 @@ class SectManager:
         player.sect_contribution += contribution_gain
         await self.db.update_player(player)
         
-        # 宗门增加资源
-        await self.db.ext.donate_to_sect(player.sect_id, 0) # 只更新建设度? donate_to_sect update both.
         # 手动更新宗门资源
         sect = await self.db.ext.get_sect_by_id(player.sect_id)
         if sect:

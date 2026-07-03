@@ -78,8 +78,13 @@ class BreakthroughManager:
             f"基础成功率：{base_success_rate:.1%}"
         ]
 
-        final_rate = base_success_rate + temp_bonus
+        # 等级突破加成（level_up_rate 为百分比整数，如5表示+5%）
+        level_bonus = player.level_up_rate / 100.0 if player.level_up_rate > 0 else 0.0
+        final_rate = base_success_rate + temp_bonus + level_bonus
         max_rate = 1.0  # 默认最大100%
+
+        if level_bonus > 0:
+            info_lines.append(f"突破加成：+{level_bonus:.1%}")
 
         if temp_bonus:
             info_lines.append(f"临时丹药加成：{temp_bonus:+.1%}")
@@ -91,8 +96,8 @@ class BreakthroughManager:
                 breakthrough_bonus = pill_data.get("breakthrough_bonus", 0)
                 max_rate = pill_data.get("max_success_rate", 1.0)
 
-                # 计算加成后的成功率
-                final_rate = min(base_success_rate + temp_bonus + breakthrough_bonus, max_rate)
+                # 计算加成后的成功率（含等级突破加成）
+                final_rate = min(base_success_rate + temp_bonus + level_bonus + breakthrough_bonus, max_rate)
 
                 info_lines.append(f"破境丹加成：+{breakthrough_bonus:.1%}")
                 info_lines.append(f"最大成功率限制：{max_rate:.1%}")
@@ -198,6 +203,7 @@ class BreakthroughManager:
                     f"寿命 +{lifespan_gain}\n"
                     f"最大气血 +{energy_gain}\n"
                     f"物伤 +{physical_damage_gain}\n"
+                    f"法伤 +{magic_damage_gain}\n"
                     f"物防 +{physical_defense_gain}\n"
                     f"法防 +{magic_defense_gain}\n"
                     f"精神力 +{mental_power_gain}\n"
@@ -205,6 +211,7 @@ class BreakthroughManager:
                     f"寿命：{player.lifespan}\n"
                     f"最大气血：{player.max_blood_qi}\n"
                     f"物伤：{player.physical_damage}\n"
+                    f"法伤：{player.magic_damage}\n"
                     f"物防：{player.physical_defense}\n"
                     f"法防：{player.magic_defense}\n"
                     f"精神力：{player.mental_power}"

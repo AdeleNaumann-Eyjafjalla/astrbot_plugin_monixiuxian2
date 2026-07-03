@@ -4,7 +4,7 @@
   <img src="logo.png" alt="模拟修仙" width="200">
 </p>
 
-> **版本:** v3.1.3  
+> **版本:** v3.1.4  
 > **许可证:** AGPL-3.0  
 > **作者:** xiaojuwa  
 > **基于:** [nonebot_plugin_xiuxian_2](https://github.com/xiuxian-2/nonebot_plugin_xiuxian_2) (部分借鉴与重构)
@@ -504,6 +504,47 @@ astrbot_plugin_monixiuxian2/
 | 悬赏过期处理 | bounty_manager.py | 完成时检查超时自动取消 |
 | 宗门名称验证 | sect_manager.py | 长度(2-12字)和敏感词检查 |
 | 传承buff应用 | combat_handlers.py | impart加成已应用到战斗 |
+
+---
+
+### v3.1.4 - 全系统Bug大修复
+
+**🔴 P0 严重修复（崩溃/数据丢失/作弊漏洞）**
+
+| 问题 | 修复位置 | 说明 |
+|------|----------|------|
+| 传承信息查看崩溃 | impart_manager.py | 移除对不存在字段 `impart_mix_exp` 的引用 |
+| 退出/踢出宗门后属性残留 | sect_manager.py | 先设置内存 `sect_id=0` 再持久化，防止 `update_player` 覆盖 |
+| 复活丹药属性减半两次（变¼） | pill_manager.py | 调整减半顺序：先减当前值再减上限 |
+| 定魂护盾已存在仍消耗丹药 | pill_manager.py | 入口处提前返回拒绝使用 |
+| 破境丹不消耗可无限复用 | breakthrough_handler.py | 突破前校验背包并扣除丹药 |
+| `level_up_rate` 字段从未生效 | breakthrough_manager.py | 纳入突破成功率计算公式 |
+| 宗主死亡后宗门变僵尸 | data_manager.py | 添加宗主死亡继承/解散机制 |
+
+**🟠 P1 高优先级修复（逻辑错误/状态不一致）**
+
+| 问题 | 修复位置 | 说明 |
+|------|----------|------|
+| 存款不更新计息时间 | bank_manager.py | 存款时始终刷新 `last_interest_time` |
+| 领取利息无事务保护 | bank_manager.py | 包装 `BEGIN IMMEDIATE` 事务 |
+| 每日签到不重置宗门任务/丹药 | player_handler.py | 签到加入每日重置逻辑 |
+| 换装时旧装备因背包满丢失 | equipment_manager.py | 先尝试存入旧装备再换新装备 |
+| 战斗中HP可变为负数 | combat_manager.py | 所有扣血改为 `max(0, hp - damage)` |
+| 玩家状态双写不一致风险 | data_manager.py | 添加 `set_player_state_atomic` 原子操作 |
+
+**🟡 P2 中等修复（体验优化/数值修正）**
+
+| 问题 | 修复位置 | 说明 |
+|------|----------|------|
+| 每日丹药上限从未生效 | pill_manager.py | JSON计数器实现每日使用限制 |
+| 传承属性无上限 | impart_manager.py | 全属性加值上限绑定为 1.0 |
+| 新角色初始属性硬编码 | cultivation_manager.py | 基于境界基础属性随机生成 |
+| 修炼时间按分钟截断 | cultivation_manager.py | 参数改为 float，精确到秒 |
+| 修炼最大时长硬编码分段 | player_handler.py | 改为 `level_index * 60` 线性公式 |
+| 体修突破缺少法伤显示 | breakthrough_manager.py | 补全体修成功信息中的法伤字段 |
+| 级联删除遗漏银行交易记录 | data_manager.py | 添加 `bank_transactions` 表级联清理 |
+| 取款不结算待领利息 | bank_manager.py | 取款前自动结算并累加利息 |
+| 传承系统模块导入隐患 | impart_manager.py | `from ..data` 改为精确导入 `data_manager` |
 
 ---
 

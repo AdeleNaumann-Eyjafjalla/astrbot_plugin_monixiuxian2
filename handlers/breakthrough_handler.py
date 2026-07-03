@@ -85,6 +85,8 @@ class BreakthroughHandler:
 
         if temp_bonus:
             info_lines.append(f"临时丹药加成：{temp_bonus:+.1%}\n")
+        if player.level_up_rate > 0:
+            info_lines.append(f"突破加成：+{player.level_up_rate / 100:.1%}\n")
         death_reduce = 1 - modifiers["permanent_death_multiplier"]
         if death_reduce > 0:
             info_lines.append(f"突破死亡概率降低：{death_reduce:.1%}\n")
@@ -162,6 +164,12 @@ class BreakthroughHandler:
                 )
                 return
 
+            # 检查背包中是否有该丹药
+            inventory = player.get_pills_inventory()
+            if pill_name not in inventory or inventory.get(pill_name, 0) <= 0:
+                yield event.plain_result(f"❌ 你的背包中没有【{pill_name}】！")
+                return
+
             yield event.plain_result(f"使用【{pill_name}】进行突破...")
         else:
             pill_name = None
@@ -174,6 +182,16 @@ class BreakthroughHandler:
             modifiers["temp_bonus"],
             modifiers["permanent_death_multiplier"]
         )
+
+        # 扣除破境丹（突破成功/失败后都要消耗）
+        if pill_name and not died:
+            inventory = player.get_pills_inventory()
+            if pill_name in inventory and inventory.get(pill_name, 0) > 0:
+                inventory[pill_name] -= 1
+                if inventory[pill_name] <= 0:
+                    del inventory[pill_name]
+                player.set_pills_inventory(inventory)
+                await self.db.update_player(player)
 
         if modifiers["has_temp_effects"]:
             await self.pill_manager.consume_breakthrough_effects(player)

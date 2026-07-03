@@ -9,6 +9,9 @@ from ..data.data_manager import DataBase
 from ..models import Player
 from ..models_extended import ImpartInfo
 
+# 传承属性硬上限
+IMPART_MAX = 1.0  # 最高100%
+
 class ImpartManager:
     """传承系统管理器"""
     
@@ -30,8 +33,6 @@ MP加成：{impart_info.impart_mp_per * 100:.1f}%
 攻击加成：{impart_info.impart_atk_per * 100:.1f}%
 会心加成：{impart_info.impart_know_per * 100:.1f}%
 爆伤加成：{impart_info.impart_burst_per * 100:.1f}%
-
-混合经验：{impart_info.impart_mix_exp}
         """.strip()
         
         return True, msg, impart_info
@@ -47,15 +48,15 @@ MP加成：{impart_info.impart_mp_per * 100:.1f}%
             impart_info = await self.db.ext.get_impart_info(user_id)
             
         if type_name == "hp":
-            impart_info.impart_hp_per += value
+            impart_info.impart_hp_per = min(IMPART_MAX, impart_info.impart_hp_per + value)
         elif type_name == "mp":
-            impart_info.impart_mp_per += value
+            impart_info.impart_mp_per = min(IMPART_MAX, impart_info.impart_mp_per + value)
         elif type_name == "atk":
-            impart_info.impart_atk_per += value
+            impart_info.impart_atk_per = min(IMPART_MAX, impart_info.impart_atk_per + value)
         elif type_name == "know":
-            impart_info.impart_know_per += value
+            impart_info.impart_know_per = min(IMPART_MAX, impart_info.impart_know_per + value)
         elif type_name == "burst":
-            impart_info.impart_burst_per += value
+            impart_info.impart_burst_per = min(IMPART_MAX, impart_info.impart_burst_per + value)
             
         await self.db.ext.update_impart_info(impart_info)
         return True, f"✨ 你的{type_name}传承属性增加了 {value*100:.1f}%！"

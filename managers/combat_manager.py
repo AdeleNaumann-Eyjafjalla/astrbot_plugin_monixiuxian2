@@ -152,7 +152,7 @@ class CombatManager:
             # 玩家1攻击
             is_crit1, damage1 = cls.calculate_turn_attack(player1.atk, player1.crit_rate)
             damage1 = cls.apply_damage_reduction(damage1, player2.defense)
-            player2.hp -= damage1
+            player2.hp = max(0, player2.hp - damage1)
             
             if is_crit1:
                 combat_log.append(f"{player1.name} 发起会心一击，造成 {damage1} 点伤害！")
@@ -166,7 +166,7 @@ class CombatManager:
             # 玩家2攻击
             is_crit2, damage2 = cls.calculate_turn_attack(player2.atk, player2.crit_rate)
             damage2 = cls.apply_damage_reduction(damage2, player1.defense)
-            player1.hp -= damage2
+            player1.hp = max(0, player1.hp - damage2)
             
             if is_crit2:
                 combat_log.append(f"{player2.name} 发起会心一击，造成 {damage2} 点伤害！")
@@ -244,7 +244,7 @@ class CombatManager:
             is_crit, damage = cls.calculate_turn_attack(player.atk, player.crit_rate)
             # Boss可能有减伤
             damage = cls.apply_damage_reduction(damage, boss.defense)
-            boss.hp -= damage
+            boss.hp = max(0, boss.hp - damage)
             total_damage_dealt += damage
             
             if is_crit:
@@ -259,7 +259,7 @@ class CombatManager:
             # Boss攻击
             is_boss_crit, boss_damage = cls.calculate_turn_attack(boss.atk, 30)  # Boss固定30会心率
             boss_damage = cls.apply_damage_reduction(boss_damage, player.defense)
-            player.hp -= boss_damage
+            player.hp = max(0, player.hp - boss_damage)
             
             if is_boss_crit:
                 combat_log.append(f"{boss.name} 发起会心一击，造成 {boss_damage} 点伤害！")

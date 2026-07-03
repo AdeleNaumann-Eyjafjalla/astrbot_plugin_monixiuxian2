@@ -111,10 +111,11 @@ class BankManager:
             
             new_balance = current_balance + amount
             now = int(time.time())
+            # 存款时总是重置利息计时（利息已按复利结算到当前余额中）
             await self.db.ext.update_bank_account(
                 player.user_id, 
                 new_balance, 
-                now if current_balance == 0 else bank_data["last_interest_time"]
+                now
             )
             
             await self._add_transaction(player.user_id, "deposit", amount, new_balance, "存入灵石")
@@ -126,7 +127,7 @@ class BankManager:
             raise
     
     async def withdraw(self, player: Player, amount: int) -> Tuple[bool, str]:
-        """取出灵石"""
+        """取出灵石（取款前自动结算待领利息）"""
         if amount <= 0:
             return False, "取款金额必须大于0。"
         
@@ -134,17 +135,21 @@ class BankManager:
         try:
             player = await self.db.get_player_by_id(player.user_id)
             bank_data = await self.db.ext.get_bank_account(player.user_id)
-            if not bank_data or bank_data["balance"] < amount:
-                await self.db.conn.rollback()
-                current = bank_data["balance"] if bank_data else 0
-                return False, f"余额不足！当前余额：{current:,} 灵石。"
+            now = int(time.time())
             
-            new_balance = bank_data["balance"] - amount
-            await self.db.ext.update_bank_account(
-                player.user_id, 
-                new_balance, 
-                bank_data["last_interest_time"]
+            # 先结算待领利息
+            interest = self._calculate_interest(
+                bank_data["balance"] if bank_data else 0,
+                bank_data["last_interest_time"] if bank_data else 0
             )
+            current_balance = (bank_data["balance"] if bank_data else 0) + interest
+            
+            if current_balance < amount:
+                await self.db.conn.rollback()
+                return False, f"余额不足！当前余额：{current_balance:,} 灵石（含利息 {interest:,}）。"
+            
+            new_balance = current_balance - amount
+            await self.db.ext.update_bank_account(player.user_id, new_balance, now)
             
             player.gold += amount
             await self.db.update_player(player)
@@ -171,15 +176,21 @@ class BankManager:
         if interest <= 0:
             return False, "利息不足1灵石，请明日再来。"
         
-        # 利息转入本金
-        new_balance = bank_data["balance"] + interest
-        now = int(time.time())
-        await self.db.ext.update_bank_account(player.user_id, new_balance, now)
-        
-        # 记录流水
-        await self._add_transaction(player.user_id, "interest", interest, new_balance, "领取利息")
-        
-        return True, f"成功领取利息 {interest:,} 灵石！\n当前余额：{new_balance:,} 灵石"
+        await self.db.conn.execute("BEGIN IMMEDIATE")
+        try:
+            # 利息转入本金
+            new_balance = bank_data["balance"] + interest
+            now = int(time.time())
+            await self.db.ext.update_bank_account(player.user_id, new_balance, now)
+            
+            # 记录流水
+            await self._add_transaction(player.user_id, "interest", interest, new_balance, "领取利息")
+            
+            await self.db.conn.commit()
+            return True, f"成功领取利息 {interest:,} 灵石！\n当前余额：{new_balance:,} 灵石"
+        except Exception as e:
+            await self.db.conn.rollback()
+            raise
     
     # ===== 贷款相关 =====
     

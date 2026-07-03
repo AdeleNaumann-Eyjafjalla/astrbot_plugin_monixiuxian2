@@ -248,6 +248,39 @@ class DataBase:
         )
         await self.conn.commit()
 
+    async def set_player_state_atomic(self, user_id: str, state: str, cd_type: int, cd_duration: int = 0):
+        """原子化更新玩家状态和 user_cd，防止双状态不一致
+
+        Args:
+            user_id: 用户ID
+            state: 玩家状态文本（"修炼中"/"空闲"等）
+            cd_type: UserStatus 枚举类型
+            cd_duration: CD 时长（秒），0 表示设为空闲
+        """
+        import time
+        now = int(time.time())
+        await self.conn.execute("BEGIN IMMEDIATE")
+        try:
+            await self.conn.execute(
+                "UPDATE players SET state = ? WHERE user_id = ?",
+                (state, user_id)
+            )
+            if cd_duration > 0:
+                await self.conn.execute(
+                    "INSERT OR REPLACE INTO user_cd (user_id, type, create_time, scheduled_time, extra_data) "
+                    "VALUES (?, ?, ?, ?, '{}')",
+                    (user_id, cd_type, now, now + cd_duration)
+                )
+            else:
+                await self.conn.execute(
+                    "DELETE FROM user_cd WHERE user_id = ?",
+                    (user_id,)
+                )
+            await self.conn.commit()
+        except Exception:
+            await self.conn.rollback()
+            raise
+
     async def delete_player(self, user_id: str):
         """删除玩家"""
         await self.conn.execute(
@@ -279,13 +312,58 @@ class DataBase:
             ("DELETE FROM impart_info WHERE user_id = ?", (user_id,)),
             ("DELETE FROM combat_cooldowns WHERE attacker_id = ? OR defender_id = ?", (user_id, user_id)),
             ("DELETE FROM pending_gifts WHERE sender_id = ? OR receiver_id = ?", (user_id, user_id)),
+            ("DELETE FROM bank_transactions WHERE user_id = ?", (user_id,)),
         ]
 
         for sql, params in statements:
             await safe_execute(sql, params)
 
+        # 处理宗主死亡：将宗门传给其他成员，若无成员则解散
+        await self._handle_sect_owner_death(user_id)
+
         await self.conn.execute("DELETE FROM players WHERE user_id = ?", (user_id,))
         await self.conn.commit()
+
+    async def _handle_sect_owner_death(self, user_id: str):
+        """处理宗主死亡：将宗门传给其他成员，若无成员则解散"""
+        try:
+            # 查找该玩家拥有的宗门
+            async with self.conn.execute(
+                "SELECT * FROM sects WHERE sect_owner = ?", (user_id,)
+            ) as cursor:
+                sects = await cursor.fetchall()
+            
+            for sect_row in sects:
+                sect = dict(sect_row)
+                # 获取其他成员（排除已死亡的宗主）
+                members = await self.ext.get_sect_members(sect["sect_id"])
+                other_members = [m for m in members if m.user_id != user_id]
+                
+                if other_members:
+                    # 传给职位最高的成员
+                    new_owner = other_members[0]
+                    await self.conn.execute(
+                        "UPDATE sects SET sect_owner = ? WHERE sect_id = ?",
+                        (new_owner.user_id, sect["sect_id"])
+                    )
+                    await self.conn.execute(
+                        "UPDATE players SET sect_position = 0 WHERE user_id = ? AND sect_id = ?",
+                        (new_owner.user_id, sect["sect_id"])
+                    )
+                    logger.info(
+                        f"[delete_player_cascade] 宗门 '{sect['sect_name']}' 宗主 {user_id} 死亡，"
+                        f"传位给 {new_owner.user_id}"
+                    )
+                else:
+                    # 无其他成员，解散宗门
+                    await self.conn.execute(
+                        "DELETE FROM sects WHERE sect_id = ?", (sect["sect_id"],)
+                    )
+                    logger.info(
+                        f"[delete_player_cascade] 宗门 '{sect['sect_name']}' 无其他成员，已解散"
+                    )
+        except Exception as e:
+            logger.warning(f"[delete_player_cascade] 处理宗门继承失败: {e}")
 
     async def get_all_players(self):
         """获取所有玩家"""

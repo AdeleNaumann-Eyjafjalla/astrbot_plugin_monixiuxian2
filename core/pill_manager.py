@@ -97,17 +97,30 @@ class PillManager:
     async def use_pill(
         self,
         player: Player,
-        pill_name: str
+        pill_name: str,
+        daily_limit: int = 10
     ) -> Tuple[bool, str]:
         """使用丹药
 
         Args:
             player: 玩家对象
             pill_name: 丹药名称
+            daily_limit: 每日最多使用丹药次数（默认10次）
 
         Returns:
             (是否成功, 消息)
         """
+        # 检查每日使用次数限制（daily_pill_usage 为 JSON 字符串）
+        import json
+        usage = {}
+        try:
+            usage = json.loads(player.daily_pill_usage) if player.daily_pill_usage else {}
+        except (json.JSONDecodeError, TypeError):
+            usage = {}
+        total_used = usage.get("_total", 0)
+        if total_used >= daily_limit:
+            return False, f"今日丹药使用次数已达上限（{daily_limit}次），请明日再来！"
+
         # 检查背包是否有该丹药
         inventory = player.get_pills_inventory()
         if pill_name not in inventory or inventory[pill_name] <= 0:
@@ -129,6 +142,15 @@ class PillManager:
             return False, (
                 f"境界不足！使用【{pill_name}】需要达到【{level_name}】"
             )
+
+        # 增加每日使用计数（子方法通过 update_player 持久化）
+        import json as _json
+        try:
+            _usage = _json.loads(player.daily_pill_usage) if player.daily_pill_usage else {}
+        except (_json.JSONDecodeError, TypeError):
+            _usage = {}
+        _usage["_total"] = _usage.get("_total", 0) + 1
+        player.daily_pill_usage = _json.dumps(_usage)
 
         # 根据丹药类型处理
         effect_type = pill_data.get("effect_type", "instant")
@@ -443,6 +465,10 @@ class PillManager:
 
     async def _use_instant_pill(self, player: Player, pill_name: str, pill_data: dict) -> Tuple[bool, str]:
         """使用瞬间效果丹药"""
+        # 定魂丹护盾检查需前置，避免丹药被无效扣除
+        if pill_data.get("blocks_next_debuff") and player.has_debuff_shield:
+            return False, "🛡️ 定魂护盾已存在，无需重复使用！"
+
         msg_parts = [
             f"✨ 服用【{pill_name}】成功！",
             "━━━━━━━━━━━━━━━"
@@ -499,13 +525,10 @@ class PillManager:
             else:
                 msg_parts.append("ℹ️ 当前没有可重置的永久增益")
 
-        # 定魂丹 - 下一次负面效果免疫
+        # 定魂丹 - 下一次负面效果免疫（重复使用已在入口拦截）
         if pill_data.get("blocks_next_debuff"):
-            if player.has_debuff_shield:
-                msg_parts.append("🛡️ 定魂护盾已存在，无需重复使用")
-            else:
-                player.has_debuff_shield = True
-                msg_parts.append("🛡️ 获得定魂护盾：下一次负面效果将被抵消")
+            player.has_debuff_shield = True
+            msg_parts.append("🛡️ 获得定魂护盾：下一次负面效果将被抵消")
 
         # 扣除丹药
         inventory = player.get_pills_inventory()
@@ -577,10 +600,10 @@ class PillManager:
         player.physical_defense = player.physical_defense // 2
         player.magic_defense = player.magic_defense // 2
         player.mental_power = player.mental_power // 2
+        player.spiritual_qi = player.spiritual_qi // 2
         player.max_spiritual_qi = player.max_spiritual_qi // 2
-        player.spiritual_qi = player.max_spiritual_qi // 2
+        player.blood_qi = player.blood_qi // 2
         player.max_blood_qi = player.max_blood_qi // 2
-        player.blood_qi = player.max_blood_qi // 2
 
         self._ensure_non_negative_attributes(player)
 

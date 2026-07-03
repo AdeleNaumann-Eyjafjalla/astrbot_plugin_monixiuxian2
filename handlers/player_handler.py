@@ -307,11 +307,9 @@ class PlayerHandler:
             yield event.plain_result("道友闭关时间不足1分钟，未获得修为。请继续闭关修炼。")
             return
 
-        # 闭关时长上限根据境界调整（基础24小时，每提升一个大境界增加6小时）
-        # level_index: 0-8练气, 9-17筑基, 18-26金丹, 27-35元婴, 36-44化神, 45-53炼虚, 54-62合体, 63-71大乘, 72+渡劫
+        # 闭关时长上限根据境界调整（基础24小时，每个境界增加1小时）
         base_minutes = 1440  # 24小时
-        realm_bonus = (player.level_index // 9) * 360  # 每个大境界增加6小时
-        MAX_CULTIVATION_MINUTES = base_minutes + realm_bonus
+        MAX_CULTIVATION_MINUTES = base_minutes + player.level_index * 60
         effective_minutes = min(duration_minutes, MAX_CULTIVATION_MINUTES)
         exceeded_time = duration_minutes > MAX_CULTIVATION_MINUTES
 
@@ -469,7 +467,22 @@ class PlayerHandler:
         # 更新玩家数据
         player.gold += check_in_gold
         player.last_check_in_date = today
+        # 每日重置：丹药使用次数
+        player.daily_pill_usage = "{}"
+        player.last_daily_reset = today
         await self.db.update_player(player)
+
+        # 每日全局重置：宗门任务次数和丹药领取标记
+        # 每天执行一次全局重置（无需每个玩家都触发）
+        try:
+            reset_key = f"last_daily_global_reset_{today}"
+            already_reset = await self.db.ext.get_system_config(reset_key)
+            if not already_reset:
+                await self.db.ext.reset_sect_tasks()
+                await self.db.ext.reset_sect_elixir_get()
+                await self.db.ext.set_system_config(reset_key, "1")
+        except Exception:
+            pass  # 全局重置失败不影响签到
 
         reply_msg = (
             "✅ 签到成功！\n"
