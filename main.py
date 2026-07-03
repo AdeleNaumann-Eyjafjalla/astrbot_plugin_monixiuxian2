@@ -306,9 +306,9 @@ class XiuXianPlugin(Star):
             count = len(stuck_users)
             user_ids = [row[0] for row in stuck_users]
             
-            # 重置 type 为 IDLE(0)，清除 scheduled_time
+            # 重置 type 为 IDLE(0)，清除 scheduled_time，extra_data 不能为 NULL (NOT NULL约束)
             await self.db.conn.execute(
-                "UPDATE user_cd SET type = 0, scheduled_time = 0, extra_data = NULL WHERE type = 4"
+                "UPDATE user_cd SET type = 0, scheduled_time = 0, extra_data = '{}' WHERE type = 4"
             )
             await self.db.conn.commit()
             

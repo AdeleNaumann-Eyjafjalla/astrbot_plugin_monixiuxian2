@@ -89,7 +89,7 @@ def player_required(func: Callable[..., Coroutine[any, any, AsyncGenerator[any, 
             if user_cd.type == UserStatus.SECT_TASK:
                 user_cd.type = UserStatus.IDLE
                 user_cd.scheduled_time = 0
-                user_cd.extra_data = None
+                user_cd.extra_data = '{}'
                 await self.db.ext.update_user_cd(user_cd)
             else:
                 # 玩家处于忙碌状态，检查命令是否在白名单中
