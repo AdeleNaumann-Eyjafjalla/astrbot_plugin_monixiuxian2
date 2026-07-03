@@ -16,7 +16,6 @@ CMD_PLAYER_INFO = "我的信息"
 CMD_START_CULTIVATION = "闭关"
 CMD_END_CULTIVATION = "出关"
 CMD_CHECK_IN = "签到"
-REBIRTH_COOLDOWN = 7 * 24 * 3600
 
 __all__ = ["PlayerHandler"]
 
@@ -496,7 +495,7 @@ class PlayerHandler:
 
     @player_required
     async def handle_rebirth(self, player: Player, event: AstrMessageEvent, confirm_text: str = ""):
-        """弃道重修（7天冷却）"""
+        """弃道重修（无冷却，但稀有灵根突破死亡风险极高）"""
         user_cd = await self.db.ext.get_user_cd(player.user_id)
         if user_cd and user_cd.type != UserStatus.IDLE:
             status_name = UserStatus.get_name(user_cd.type)
@@ -512,39 +511,47 @@ class PlayerHandler:
             yield event.plain_result("❌ 你仍有未结清的灵石贷款，无法重修。请先还款。")
             return
 
-        key = f"rebirth_last_{player.user_id}"
-        last_ts = await self.db.ext.get_system_config(key)
-        now = int(time.time())
-        if last_ts:
-            diff = now - int(last_ts)
-            if diff < REBIRTH_COOLDOWN:
-                remaining = REBIRTH_COOLDOWN - diff
-                days = remaining // 86400
-                hours = (remaining % 86400) // 3600
-                minutes = (remaining % 3600) // 60
-                yield event.plain_result(
-                    "⌛ 弃道重修冷却中\n"
-                    "━━━━━━━━━━━━━━━\n"
-                    f"距离下次重修还需：{days}天{hours}小时{minutes}分钟"
-                )
-                return
+        # 显示当前灵根的劫数信息
+        current_root = player.spiritual_root
+        death_mult = self.cultivation_manager.get_root_death_multiplier(current_root)
+        root_desc = self.cultivation_manager.get_root_death_description(current_root)
 
         if confirm_text.strip() != "确认":
             yield event.plain_result(
-                "⚠️ 弃道重修将删除当前角色的所有数据，并无法撤回！\n"
-                "限制：每7天只能重修一次，且必须在空闲状态、无贷款时使用。\n"
+                "🔥 弃道重修 — 天道劫数 🔥\n"
                 "━━━━━━━━━━━━━━━\n"
-                "若你已做好准备，请发送：\n"
+                "⚠️ 弃道重修将删除当前角色的所有数据，无法撤回！\n"
+                f"\n📛 当前灵根：{current_root}\n"
+                f"⚡ 当前劫数：{root_desc}\n"
+                f"💀 突破失败死亡倍率：×{death_mult:.1f}\n"
+                f"\n━━━━━━━━━━━━━━━\n"
+                "⚡ 天道劫数说明 ⚡\n"
+                "━━━━━━━━━━━━━━━\n"
+                "• 重修后可无限次刷灵根，无冷却限制\n"
+                "• 但灵根越稀有，突破失败死亡概率越高！\n"
+                "• 伪灵根：×0.5 → 天道不屑，5%封顶\n"
+                "• 单灵根：×2.5 → 劫数临身，最高25%死亡\n"
+                "• 天灵根：×10.0 → 天妒英才，失败必死！\n"
+                "• 混沌灵根：×35.0 → 混沌不容，十死无生\n"
+                "• 先天道体：×50.0 → 禁忌之劫，没有回生丹寸步难行！\n"
+                "━━━━━━━━━━━━━━━\n"
+                "💡 回生丹是你唯一的保命手段！\n"
+                "刷到好灵根只是开始，活到飞升才是真本事！\n"
+                "\n若你已做好准备，请发送：\n"
                 "弃道重修 确认"
             )
             return
 
         await self.db.delete_player_cascade(player.user_id)
-        await self.db.ext.set_system_config(key, str(now))
 
         yield event.plain_result(
             "💀 你选择了弃道重修，旧生一切化为尘埃。\n"
             "━━━━━━━━━━━━━━━\n"
             "可立即使用「我要修仙」重新踏上仙途。\n"
-            "（7天内不可再次重修）"
+            "无冷却限制，可随时再次重修刷取灵根。\n"
+            "━━━━━━━━━━━━━━━\n"
+            "⚠️ 天道劫数提醒 ⚠️\n"
+            "灵根越稀有 → 突破失败死亡概率极高\n"
+            "天灵根以上几乎每次突破都在赌命！\n"
+            "备好回生丹再入仙途，否则重修的尽头是轮回..."
         )

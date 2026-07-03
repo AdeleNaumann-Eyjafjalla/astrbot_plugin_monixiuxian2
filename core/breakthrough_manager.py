@@ -89,15 +89,13 @@ class BreakthroughManager:
         if temp_bonus:
             info_lines.append(f"临时丹药加成：{temp_bonus:+.1%}")
 
-        # 如果使用了破境丹
+        # 如果使用了破境丹，在基础成功率上叠加并受上限约束
         if pill_name:
             pill_data = self.config_manager.pills_data.get(pill_name)
             if pill_data and pill_data.get("subtype") == "breakthrough":
                 breakthrough_bonus = pill_data.get("breakthrough_bonus", 0)
                 max_rate = pill_data.get("max_success_rate", 1.0)
-
-                # 计算加成后的成功率（含等级突破加成）
-                final_rate = min(base_success_rate + temp_bonus + level_bonus + breakthrough_bonus, max_rate)
+                final_rate = min(final_rate + breakthrough_bonus, max_rate)
 
                 info_lines.append(f"破境丹加成：+{breakthrough_bonus:.1%}")
                 info_lines.append(f"最大成功率限制：{max_rate:.1%}")
@@ -122,10 +120,18 @@ class BreakthroughManager:
         Args:
             player: 玩家对象
             pill_name: 使用的破境丹名称（可选）
+            temp_bonus: 临时丹药成功率加成
+            death_rate_multiplier: 综合死亡倍率（丹药保护 × 灵根劫数）。必须由调用方计算并传入！
 
         Returns:
             (是否成功, 消息, 是否死亡)
         """
+        # 安全检查：如果调用方使用默认值1.0，可能忽略了灵根劫数
+        if death_rate_multiplier == 1.0:
+            logger.warning(
+                f"execute_breakthrough 收到默认 death_rate_multiplier=1.0，"
+                f"玩家 {player.user_id} 灵根 {player.spiritual_root} 的劫数可能被忽略！"
+            )
         # 检查突破条件
         can_breakthrough, error_msg = self.check_breakthrough_requirements(player)
         if not can_breakthrough:

@@ -269,6 +269,72 @@
       }
     }
   },
+  "SPIRIT_ROOT_DEATH_MULTIPLIERS": {
+    "description": "灵根突破失败死亡倍率（天道劫数）。灵根越稀有，逆天而行越遭天道不容，突破失败时的死亡概率越高。",
+    "type": "object",
+    "items": {
+      "PSEUDO_DEATH_MULTIPLIER": {
+        "description": "伪灵根死亡倍率",
+        "type": "float",
+        "default": 0.5,
+        "hint": "废柴灵根，天道不屑关注，死亡风险极低。"
+      },
+      "QUAD_DEATH_MULTIPLIER": {
+        "description": "四灵根死亡倍率",
+        "type": "float",
+        "default": 0.8,
+        "hint": "资质平庸，天劫较弱。"
+      },
+      "TRI_DEATH_MULTIPLIER": {
+        "description": "三灵根死亡倍率",
+        "type": "float",
+        "default": 1.2,
+        "hint": "灵根较杂，劫数一般。"
+      },
+      "DUAL_DEATH_MULTIPLIER": {
+        "description": "双灵根死亡倍率",
+        "type": "float",
+        "default": 1.8,
+        "hint": "双灵根者，已被天道注意。"
+      },
+      "WUXING_DEATH_MULTIPLIER": {
+        "description": "五行单灵根死亡倍率（基准）",
+        "type": "float",
+        "default": 2.5,
+        "hint": "单灵根修真大道，劫数已然不轻。此值为基准倍率。"
+      },
+      "VARIANT_DEATH_MULTIPLIER": {
+        "description": "变异灵根死亡倍率（雷/冰/风/暗/光）",
+        "type": "float",
+        "default": 5.0,
+        "hint": "变异灵根逆天而行，天劫开始真正凶险！"
+      },
+      "HEAVENLY_DEATH_MULTIPLIER": {
+        "description": "天灵根死亡倍率",
+        "type": "float",
+        "default": 10.0,
+        "hint": "天选之子遭天妒，每一级突破都是生死赌博！"
+      },
+      "LEGENDARY_DEATH_MULTIPLIER": {
+        "description": "传说级灵根死亡倍率（阴阳/融合）",
+        "type": "float",
+        "default": 20.0,
+        "hint": "传说灵根为大道之敌，每次突破皆为九死一生！"
+      },
+      "MYTHIC_DEATH_MULTIPLIER": {
+        "description": "神话级灵根死亡倍率（混沌）",
+        "type": "float",
+        "default": 35.0,
+        "hint": "混沌灵根扰乱天地秩序，突破即是赌命！"
+      },
+      "DIVINE_BODY_DEATH_MULTIPLIER": {
+        "description": "禁忌体质死亡倍率（先天道体/神圣体质）",
+        "type": "float",
+        "default": 50.0,
+        "hint": "禁忌体质天地不容，没有回生丹寸步难行！"
+      }
+    }
+  },
   "FILES": {
     "description": "文件路径配置",
     "type": "object",

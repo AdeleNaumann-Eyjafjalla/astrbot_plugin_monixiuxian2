@@ -2,7 +2,7 @@
 
 from astrbot.api.event import AstrMessageEvent
 from ..data import DataBase
-from ..core import BreakthroughManager, PillManager
+from ..core import BreakthroughManager, PillManager, CultivationManager
 from ..config_manager import ConfigManager
 from ..models import Player
 from .utils import player_required
@@ -22,6 +22,7 @@ class BreakthroughHandler:
         self.config = config
         self.breakthrough_manager = BreakthroughManager(db, config_manager, config)
         self.pill_manager = PillManager(db, config_manager)
+        self.cultivation_manager = CultivationManager(config, config_manager)
 
     @player_required
     async def handle_breakthrough_info(self, player: Player, event: AstrMessageEvent):
@@ -60,7 +61,8 @@ class BreakthroughHandler:
                 pill_data.get("target_level_index") == player.level_index + 1):
                 max_rate = pill_data.get("max_success_rate", 1.0)
                 breakthrough_bonus = pill_data.get("breakthrough_bonus", 0)
-                final_rate = min(base_success_rate + temp_bonus + breakthrough_bonus, max_rate)
+                level_bonus = player.level_up_rate / 100.0 if player.level_up_rate > 0 else 0.0
+                final_rate = min(base_success_rate + temp_bonus + level_bonus + breakthrough_bonus, max_rate)
                 available_pills.append({
                     "name": pill_name,
                     "rank": pill_data.get("rank", ""),
@@ -73,6 +75,7 @@ class BreakthroughHandler:
             f"=== {display_name} 的突破信息 ===\n",
             f"当前境界：{current_level_name}\n",
             f"下一境界：{next_level_name}\n",
+            f"当前灵根：{player.spiritual_root}\n",
             f"━━━━━━━━━━━━━━━\n",
             f"【突破条件】\n",
             f"所需修为：{required_exp}\n",
@@ -87,9 +90,22 @@ class BreakthroughHandler:
             info_lines.append(f"临时丹药加成：{temp_bonus:+.1%}\n")
         if player.level_up_rate > 0:
             info_lines.append(f"突破加成：+{player.level_up_rate / 100:.1%}\n")
-        death_reduce = 1 - modifiers["permanent_death_multiplier"]
-        if death_reduce > 0:
-            info_lines.append(f"突破死亡概率降低：{death_reduce:.1%}\n")
+
+        # 灵根劫数信息
+        root_death_mult = self.cultivation_manager.get_root_death_multiplier(player.spiritual_root)
+        root_death_desc = self.cultivation_manager.get_root_death_description(player.spiritual_root)
+        pill_protection = modifiers["permanent_death_multiplier"]
+        combined_death = pill_protection * root_death_mult
+
+        info_lines.extend([
+            f"━━━━━━━━━━━━━━━\n",
+            f"⚡【天道劫数】⚡\n",
+            f"灵根劫数：{root_death_desc}\n",
+            f"灵根死亡倍率：×{root_death_mult:.1f}\n",
+            f"丹药死亡保护：×{pill_protection:.2f}\n",
+            f"综合死亡倍率：×{combined_death:.1f}\n",
+            f"突破失败死亡范围：{0.01*combined_death:.1%} ~ {min(0.1*combined_death,1.0):.1%}\n",
+        ])
 
         if available_pills:
             info_lines.append(f"\n【可用破境丹】\n")
@@ -109,7 +125,8 @@ class BreakthroughHandler:
                 f"• 使用命令：{CMD_BREAKTHROUGH} 或 {CMD_BREAKTHROUGH} [破境丹名称]\n",
                 f"• 突破成功：境界提升，肉身更强\n",
                 f"• 突破失败：损失10%修为，有概率死亡\n",
-                f"• 死亡后：所有数据清除，需重新入仙途\n",
+                f"• 灵根越稀有，死亡风险越高！\n",
+                f"• 回生丹可抵挡一次死亡并保留角色\n",
                 f"=" * 28
             ])
         else:
@@ -119,7 +136,8 @@ class BreakthroughHandler:
                 f"• 使用命令：{CMD_BREAKTHROUGH} 或 {CMD_BREAKTHROUGH} [破境丹名称]\n",
                 f"• 突破成功：境界提升，实力大增\n",
                 f"• 突破失败：损失10%修为，有概率死亡\n",
-                f"• 死亡后：所有数据清除，需重新入仙途\n",
+                f"• 灵根越稀有，死亡风险越高！\n",
+                f"• 回生丹可抵挡一次死亡并保留角色\n",
                 f"=" * 28
             ])
 
@@ -176,11 +194,16 @@ class BreakthroughHandler:
             yield event.plain_result("开始尝试突破...")
 
         # 执行突破
+        # 综合死亡倍率 = 丹药保护倍率 × 灵根劫数倍率
+        pill_death_protection = modifiers["permanent_death_multiplier"]
+        root_death_mult = self.cultivation_manager.get_root_death_multiplier(player.spiritual_root)
+        combined_death_mult = pill_death_protection * root_death_mult
+
         success, message, died = await self.breakthrough_manager.execute_breakthrough(
             player,
             pill_name,
             modifiers["temp_bonus"],
-            modifiers["permanent_death_multiplier"]
+            combined_death_mult
         )
 
         # 扣除破境丹（突破成功/失败后都要消耗）

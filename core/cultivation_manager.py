@@ -95,6 +95,12 @@ class CultivationManager:
             "DIVINE_BODY": ["先天道体", "神圣体质"]
         }
 
+        # 灵根名称 → 品类映射（用于死亡倍率等品类级查询）
+        self._root_category_map: Dict[str, str] = {}
+        for category, roots in self.root_pools.items():
+            for root in roots:
+                self._root_category_map[root] = category
+
     def _calculate_base_stats(self, level_index: int, cultivation_type: str = "灵修") -> Dict[str, int]:
         """从境界配置中读取基础属性
 
@@ -347,6 +353,62 @@ class CultivationManager:
         speeds_config = self.config.get("SPIRIT_ROOT_SPEEDS", {})
         speed = speeds_config.get(config_key, 1.0)
         return speed
+
+    def get_root_category(self, spiritual_root: str) -> str:
+        """获取灵根所属品类
+
+        Args:
+            spiritual_root: 玩家灵根字符串（如"金灵根"、"混沌灵根"）
+
+        Returns:
+            品类名（PSEUDO/QUAD/TRI/DUAL/WUXING/VARIANT/HEAVENLY/LEGENDARY/MYTHIC/DIVINE_BODY），未找到返回"UNKNOWN"
+        """
+        root_name = spiritual_root.replace("灵根", "")
+        return self._root_category_map.get(root_name, "UNKNOWN")
+
+    def get_root_death_multiplier(self, spiritual_root: str) -> float:
+        """获取灵根对应的突破失败死亡概率倍率（天道劫数）
+
+        灵根越稀有，逆天而行越遭天道不容，突破失败时死亡概率越高。
+        例：先天道体=12倍 → 基础1-10%死亡概率变为12%-100%
+
+        Args:
+            spiritual_root: 玩家灵根字符串（如"金灵根"、"先天道体灵根"）
+
+        Returns:
+            死亡概率倍率（默认1.0）
+        """
+        category = self.get_root_category(spiritual_root)
+        if category == "UNKNOWN":
+            return 1.0
+
+        multipliers = self.config.get("SPIRIT_ROOT_DEATH_MULTIPLIERS", {})
+        key = f"{category}_DEATH_MULTIPLIER"
+        return multipliers.get(key, 1.0)
+
+    def get_root_death_description(self, spiritual_root: str) -> str:
+        """获取灵根对应的天道劫数文字描述
+
+        Args:
+            spiritual_root: 玩家灵根字符串
+
+        Returns:
+            劫数描述文本
+        """
+        multiplier = self.get_root_death_multiplier(spiritual_root)
+        descriptions = {
+            0.5: "天道不屑 ⭐（劫数极弱）",
+            0.8: "凡尘微末 ⭐⭐（劫数微弱）",
+            1.2: "寻常劫数 ⭐⭐（劫数较轻）",
+            1.8: "小有波折 ⭐⭐⭐（劫数已显）",
+            2.5: "劫数临身 ⭐⭐⭐（劫数正常）",
+            5.0: "逆天之路 🔥🔥（劫数凶险）",
+            10.0: "天妒英才 💀💀💀（劫数夺命）",
+            20.0: "大道之敌 ☠️☠️☠️（劫数极凶）",
+            35.0: "混沌不容 ☠️☠️☠️（劫数致命）",
+            50.0: "禁忌之劫 ☠️☠️☠️☠️（劫数必杀）",
+        }
+        return descriptions.get(multiplier, f"未知劫数（×{multiplier:.1f}）")
 
     def calculate_cultivation_exp(
         self,
