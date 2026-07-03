@@ -185,6 +185,11 @@ class EquipmentManager:
         if not can_equip:
             return False, error_msg
 
+        # 从DB同步储物戒数据（避免 update_player 覆盖 handler 中 retrieve_item 的扣除）
+        fresh = await self.db.get_player_by_id(player.user_id)
+        if fresh:
+            player.storage_ring_items = fresh.storage_ring_items
+
         # 根据物品类型装备到相应位置
         if item.item_type == "weapon":
             old_item = player.weapon

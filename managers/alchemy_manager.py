@@ -210,7 +210,7 @@ class AlchemyManager:
         # 5. 扣除所有材料
         player.gold -= required_gold
         
-        # 扣除储物戒中的材料
+        # 扣除储物戒中的材料（retrieve_item 内部独立提交）
         consumed_materials = []
         if self.storage_ring_manager:
             for material_name, required_count in materials.items():
@@ -219,6 +219,11 @@ class AlchemyManager:
                 success, _ = await self.storage_ring_manager.retrieve_item(player, material_name, required_count)
                 if success:
                     consumed_materials.append(f"{material_name}×{required_count}")
+        
+        # 从DB同步储物戒数据（避免后续 update_player 覆盖 retrieve_item 的扣除）
+        fresh = await self.db.get_player_by_id(player.user_id)
+        if fresh:
+            player.storage_ring_items = fresh.storage_ring_items
         
         # 6. 判断成功率
         success_rate = recipe["success_rate"]
