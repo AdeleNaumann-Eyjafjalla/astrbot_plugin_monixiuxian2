@@ -282,6 +282,9 @@ class XiuXianPlugin(Star):
         # 确保系统配置表存在
         await self.db.ext.ensure_system_config_table()
         
+        # v3.2.1 数据修复：清除因旧版宗门任务Bug卡在 SECT_TASK(type=4) 状态的用户
+        await self._fix_stuck_sect_task_users()
+        
         # 启动定时任务
         self.boss_task = asyncio.create_task(self._schedule_boss_spawn())
         self.loan_check_task = asyncio.create_task(self._schedule_loan_check())
@@ -289,6 +292,29 @@ class XiuXianPlugin(Star):
         self.bounty_check_task = asyncio.create_task(self._schedule_bounty_check())
         
         logger.info("【修仙插件】已加载。")
+
+    async def _fix_stuck_sect_task_users(self):
+        """v3.2.1 一键修复：清除因旧版Bug卡在宗门任务状态的用户"""
+        try:
+            cursor = await self.db.conn.execute(
+                "SELECT user_id FROM user_cd WHERE type = 4"
+            )
+            stuck_users = await cursor.fetchall()
+            if not stuck_users:
+                return
+            
+            count = len(stuck_users)
+            user_ids = [row[0] for row in stuck_users]
+            
+            # 重置 type 为 IDLE(0)，清除 scheduled_time
+            await self.db.conn.execute(
+                "UPDATE user_cd SET type = 0, scheduled_time = 0, extra_data = NULL WHERE type = 4"
+            )
+            await self.db.conn.commit()
+            
+            logger.info(f"【数据修复】已修复 {count} 个卡在宗门任务状态的用户: {user_ids}")
+        except Exception as e:
+            logger.warning(f"【数据修复】宗门任务状态修复跳过（可能user_cd表不存在）: {e}")
 
     async def terminate(self):
         if self.boss_task:
