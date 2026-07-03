@@ -255,7 +255,10 @@ class RiftManager:
             if item_lines:
                 item_msg = "\n\n📦 获得物品：\n" + "\n".join(item_lines)
         
-        # 7. 应用奖励
+        # 7. 应用奖励 - 先从DB同步储物戒数据（避免覆盖 store_item 已写入的数据）
+        fresh = await self.db.get_player_by_id(player.user_id)
+        if fresh:
+            player.storage_ring_items = fresh.storage_ring_items
         player.experience += exp_reward
         player.gold += gold_reward
         await self.db.update_player(player)

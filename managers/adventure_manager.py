@@ -241,6 +241,10 @@ class AdventureManager:
         rewards = self._calculate_rewards(player, route, effective_duration, event)
         dropped_items, item_msg = await self._handle_drops(player, route, event)
 
+        # 从DB同步储物戒数据（避免 update_player 覆盖 store_item 已写入的数据）
+        fresh = await self.db.get_player_by_id(player.user_id)
+        if fresh:
+            player.storage_ring_items = fresh.storage_ring_items
         player.experience += rewards["exp"]
         player.gold += rewards["gold"]
         await self.db.update_player(player)

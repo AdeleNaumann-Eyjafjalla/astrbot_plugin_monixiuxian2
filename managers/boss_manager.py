@@ -240,10 +240,13 @@ ATK：{atk}
             boss.status = 0  # 标记Boss为已击败
             await self.db.ext.defeat_boss(boss.boss_id)
             
-            # 发放奖励
+            # 先保存灵石和HP/MP到数据库（在物品掉落之前，避免覆盖储物戒数据）
             player.gold += reward
+            player.hp = battle_result["player_final_hp"]
+            player.mp = battle_result["player_final_mp"]
+            await self.db.update_player(player)
             
-            # 物品掉落
+            # 物品掉落（store_item 内部独立提交，不会冲突）
             item_msg = ""
             dropped_items = []
             if self.storage_ring_manager:
@@ -276,6 +279,15 @@ HP：{battle_result['player_final_hp']}/{player_stats.max_hp}
             boss.hp = battle_result["boss_final_hp"]
             await self.db.ext.update_boss(boss)
             
+            # 即使失败也给予部分奖励
+            if reward > 0:
+                player.gold += reward
+            
+            # 更新玩家HP/MP
+            player.hp = battle_result["player_final_hp"]
+            player.mp = battle_result["player_final_mp"]
+            await self.db.update_player(player)
+            
             result_msg = f"""
 💀 挑战失败
 ━━━━━━━━━━━━━━━
@@ -287,15 +299,6 @@ HP：{battle_result['player_final_hp']}/{player_stats.max_hp}
 
 {boss.boss_name} 剩余HP：{boss.hp}/{boss.max_hp}
             """.strip()
-            
-            # 即使失败也给予部分奖励
-            if reward > 0:
-                player.gold += reward
-        
-        # 更新玩家HP/MP
-        player.hp = battle_result["player_final_hp"]
-        player.mp = battle_result["player_final_mp"]
-        await self.db.update_player(player)
         
         # 返回完整战斗日志
         combat_log = "\n".join(battle_result["combat_log"])

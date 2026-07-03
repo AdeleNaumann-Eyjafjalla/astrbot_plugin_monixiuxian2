@@ -214,6 +214,11 @@ class ShopHandler:
                 yield event.plain_result(f"未知的物品类型：{item_type}")
                 return
 
+            # 从DB同步储物戒数据（store_item 在同一事务内已写入DB，避免后续 update_player 覆盖）
+            fresh = await self.db.get_player_by_id(player.user_id)
+            if fresh:
+                player.storage_ring_items = fresh.storage_ring_items
+
             player.gold -= total_price
             await self.db.update_player(player)
             await self.db.conn.commit()
