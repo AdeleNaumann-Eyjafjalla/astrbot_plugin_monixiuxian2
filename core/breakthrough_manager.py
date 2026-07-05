@@ -324,7 +324,7 @@ class BreakthroughManager:
                     f"🔮 轮回选择：\n"
                     f"  · 输入「我要修仙 灵修」重新随机灵根\n"
                     f"  · 输入「我要修仙 灵修 继承」保留灵根【{saved_root}】\n"
-                    f"（"体修"同理，替换"灵修"即可）"
+                    f'（"体修"同理，替换"灵修"即可）'
                 )
 
                 logger.info(
