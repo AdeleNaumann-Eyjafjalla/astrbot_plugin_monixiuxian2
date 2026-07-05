@@ -16,8 +16,8 @@ CMD_START_CULTIVATION = "闭关"
 CMD_END_CULTIVATION = "出关"
 CMD_CHECK_IN = "签到"
 
-# 忙碌状态下允许执行的命令白名单
-BUSY_STATE_ALLOWED_COMMANDS = [
+# 闭关状态下允许执行的命令白名单（闭关时只能做最基本的操作）
+CULTIVATING_ALLOWED_COMMANDS = [
     # 基础信息查看
     CMD_PLAYER_INFO,
     "我的信息",
@@ -53,6 +53,42 @@ BUSY_STATE_ALLOWED_COMMANDS = [
     "结束历练",
     "结束秘境",
     "结束任务",
+]
+
+# 历练/探索状态下禁止执行的命令黑名单（只能禁止开启新的冲突活动）
+ADVENTURING_BLOCKED_COMMANDS = [
+    # 闭关（已在其他活动中）
+    CMD_START_CULTIVATION,
+    "闭关",
+    # 启动新的历练/秘境
+    "开始历练",
+    "探索秘境",
+    # 战斗相关
+    "决斗",
+    "切磋",
+    "挑战Boss",
+    # 宗门修改性操作
+    "创建宗门",
+    "加入宗门",
+    "退出宗门",
+    "宗门捐献",
+    "踢出成员",
+    "宗主传位",
+    "职位变更",
+    # 炼丹（耗时活动）
+    "炼丹",
+    # 双修
+    "双修",
+    "接受双修",
+    "拒绝双修",
+    # 传承挑战
+    "传承挑战",
+    # 悬赏接取
+    "接取悬赏",
+    # 灵眼抢占
+    "抢占灵眼",
+    # 弃道重修
+    "弃道重修",
 ]
 
 
@@ -91,18 +127,24 @@ def player_required(func: Callable[..., Coroutine[any, any, AsyncGenerator[any, 
                 user_cd.scheduled_time = 0
                 user_cd.extra_data = '{}'
                 await self.db.ext.update_user_cd(user_cd)
-            else:
-                # 玩家处于忙碌状态，检查命令是否在白名单中
-                is_allowed = _is_command_allowed(message_text, BUSY_STATE_ALLOWED_COMMANDS)
-                
+            elif user_cd.type == UserStatus.CULTIVATING:
+                # 闭关状态：使用白名单，仅允许最基本操作
+                is_allowed = _is_command_allowed(message_text, CULTIVATING_ALLOWED_COMMANDS)
                 if not is_allowed:
                     status_name = UserStatus.get_name(user_cd.type)
-                    yield event.plain_result(f"道友当前正在「{status_name}」，无法分心他顾。\n💡 可使用「我的信息」「签到」「银行」等基础指令。")
+                    yield event.plain_result(f"道友当前正在「{status_name}」，无法分心他顾。\n💡 可使用「出关」「我的信息」「签到」「银行」等基础指令。")
+                    return
+            else:
+                # 历练/探索状态：使用黑名单，仅禁止开启新的冲突活动
+                is_blocked = _is_command_allowed(message_text, ADVENTURING_BLOCKED_COMMANDS)
+                if is_blocked:
+                    status_name = UserStatus.get_name(user_cd.type)
+                    yield event.plain_result(f"道友当前正在「{status_name}」，无法同时进行此操作。\n💡 可先「结束历练」或「结束秘境」后再试。")
                     return
         
-        # 状态检查：如果处于修炼中（闭关），只允许出关、查看信息和签到
+        # 状态检查：如果处于修炼中（闭关），只允许白名单内操作
         if player.state == "修炼中":
-            is_allowed = _is_command_allowed(message_text, BUSY_STATE_ALLOWED_COMMANDS)
+            is_allowed = _is_command_allowed(message_text, CULTIVATING_ALLOWED_COMMANDS)
 
             if not is_allowed:
                 yield event.plain_result(f"道友当前正在「{player.state}」中，无法分心他顾。\n💡 可使用「出关」「我的信息」「签到」「银行」等基础指令。")
