@@ -653,7 +653,7 @@ class SectManager:
             await self.db.ext.update_sect(sect)
 
         # 记录1小时冷却
-        extra["sect_task_cd"] = current_time + 3600
+        extra["sect_task_cd"] = current_time + 1800
         user_cd.extra_data = json.dumps(extra, ensure_ascii=False)
         await self.db.ext.update_user_cd(user_cd)
         
