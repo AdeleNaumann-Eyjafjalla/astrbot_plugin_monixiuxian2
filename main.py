@@ -20,7 +20,6 @@ from .managers import (
     BankManager, BountyManager, ImpartPkManager,
     BlessedLandManager, SpiritFarmManager, DualCultivationManager, SpiritEyeManager
 )
-from .utils.image_generator import ImageGenerator
 
 
 def require_whitelist(func):
@@ -182,8 +181,7 @@ class XiuXianPlugin(Star):
         db_path = plugin_data_path / db_filename
         self.db = DataBase(str(db_path))
 
-        self.image_generator = ImageGenerator()
-        self.misc_handler = MiscHandler(self.db, self.image_generator)
+        self.misc_handler = MiscHandler(self.db)
         self.player_handler = PlayerHandler(self.db, self.config, self.config_manager)
         self.equipment_handler = EquipmentHandler(self.db, self.config_manager)
         self.breakthrough_handler = BreakthroughHandler(self.db, self.config_manager, self.config)

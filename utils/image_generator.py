@@ -1,7 +1,7 @@
 import asyncio
 from io import BytesIO
 from pathlib import Path
-from typing import Optional, Dict, List
+from typing import Optional, Dict
 
 try:
     from PIL import Image, ImageDraw, ImageFont
@@ -18,38 +18,6 @@ ASSETS_PATH = Path(get_astrbot_data_path()) / "xiuxian"
 FONT_PATH = ASSETS_PATH / "font" / "font.ttf"
 IMG_PATH = ASSETS_PATH / "info_img"
 
-# 跨平台中文字体优先级列表
-_CJK_FONT_CANDIDATES = [
-    # macOS
-    "/System/Library/Fonts/PingFang.ttc",
-    "/System/Library/Fonts/STHeiti Light.ttc",
-    "/System/Library/Fonts/Hiragino Sans GB.ttc",
-    "/Library/Fonts/Arial Unicode.ttf",
-    # Linux
-    "/usr/share/fonts/truetype/wqy/wqy-zenhei.ttc",
-    "/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc",
-    "/usr/share/fonts/truetype/droid/DroidSansFallbackFull.ttf",
-    "/usr/share/fonts/truetype/wqy/wqy-microhei.ttc",
-    # Windows
-    "C:/Windows/Fonts/msyh.ttc",
-    "C:/Windows/Fonts/simhei.ttf",
-    "C:/Windows/Fonts/simsun.ttc",
-]
-
-def _find_cjk_font_path() -> Optional[str]:
-    """查找可用的中文字体文件路径"""
-    # 先尝试插件的自定义字体
-    if FONT_PATH.exists():
-        return str(FONT_PATH)
-    # 再尝试系统字体
-    for candidate in _CJK_FONT_CANDIDATES:
-        if Path(candidate).exists():
-            return candidate
-    return None
-
-# 缓存找到的字体路径
-_CACHED_CJK_FONT_PATH = _find_cjk_font_path()
-
 class ImageGenerator:
     """图片生成器"""
     
@@ -63,18 +31,6 @@ class ImageGenerator:
             # 尝试使用系统字体或默认
             return ImageFont.load_default()
         return ImageFont.truetype(str(FONT_PATH), size)
-
-    @staticmethod
-    def _get_cjk_font(size: int) -> ImageFont.FreeTypeFont:
-        """获取中文字体，优先资源包字体，其次系统字体"""
-        global _CACHED_CJK_FONT_PATH
-        if _CACHED_CJK_FONT_PATH and Path(_CACHED_CJK_FONT_PATH).exists():
-            return ImageFont.truetype(_CACHED_CJK_FONT_PATH, size)
-        # 重新查找
-        _CACHED_CJK_FONT_PATH = _find_cjk_font_path()
-        if _CACHED_CJK_FONT_PATH:
-            return ImageFont.truetype(_CACHED_CJK_FONT_PATH, size)
-        return ImageFont.load_default()
 
     async def generate_user_info_card(self, user_id: str, detail_map: Dict) -> Optional[BytesIO]:
         """
@@ -166,137 +122,6 @@ class ImageGenerator:
         img.save(output, format="JPEG", quality=90)
         output.seek(0)
         return output
-
-    # ===== 帮助图片生成 =====
-
-    async def generate_help_image(self, lines: List[str]) -> Optional[str]:
-        """生成帮助图片，返回临时文件路径"""
-        if not self.has_pil:
-            return None
-        try:
-            return await asyncio.to_thread(self._draw_help_sync, lines)
-        except Exception as e:
-            logger.error(f"【修仙插件】生成帮助图片失败: {e}")
-            return None
-
-    def _draw_help_sync(self, lines: List[str]) -> Optional[str]:
-        """同步绘制帮助图片"""
-        # 颜色方案：深色修仙主题
-        BG_COLOR = (22, 24, 46)         # 深蓝黑背景
-        TITLE_COLOR = (255, 215, 80)    # 金色标题
-        HEADER_COLOR = (240, 180, 60)   # 暗金 section header
-        BODY_COLOR = (210, 210, 220)    # 浅灰白正文
-        CMD_COLOR = (180, 220, 255)     # 淡蓝指令名
-        DESC_COLOR = (150, 155, 170)    # 灰色描述
-        ACCENT_COLOR = (255, 120, 80)   # 橘红强调
-        WARN_COLOR = (255, 160, 60)     # 橙色警告
-        SEP_COLOR = (60, 62, 80)        # 分隔线色
-
-        # 字体
-        title_font = self._get_cjk_font(36)
-        header_font = self._get_cjk_font(22)
-        body_font = self._get_cjk_font(18)
-        small_font = self._get_cjk_font(13)
-
-        # 尺寸计算
-        PAD_X = 50
-        PAD_TOP = 40
-        PAD_BOTTOM = 40
-        LINE_HEIGHT = 28
-        HEADER_GAP = 12     # section header 前额外间距
-        width = 860
-
-        # 先计算总高度
-        total_height = PAD_TOP
-        for line in lines:
-            stripped = line.strip()
-            if not stripped:
-                total_height += LINE_HEIGHT // 2
-            elif stripped.startswith("📖") or stripped.startswith("━━"):
-                total_height += LINE_HEIGHT if "📖" in stripped else LINE_HEIGHT // 2
-            elif any(stripped.startswith(c) for c in "📖🧘🎒💊🏪📦🏦📜🏛️⚔️📊🚶🌀🔥✨🏔️🌾💕👁️"):
-                total_height += LINE_HEIGHT + HEADER_GAP
-            elif stripped.startswith("💡") or stripped.startswith("📋"):
-                total_height += LINE_HEIGHT + HEADER_GAP
-            else:
-                total_height += LINE_HEIGHT
-        total_height += PAD_BOTTOM
-
-        # 创建画布
-        img = Image.new("RGB", (width, total_height), BG_COLOR)
-        draw = ImageDraw.Draw(img)
-
-        y = PAD_TOP
-
-        for line in lines:
-            stripped = line.strip()
-            if not stripped:
-                y += LINE_HEIGHT // 2
-                continue
-
-            # 标题行
-            if stripped.startswith("📖 修仙指令大全"):
-                bbox = draw.textbbox((0, 0), stripped, font=title_font)
-                tw = bbox[2] - bbox[0]
-                draw.text(((width - tw) / 2, y), stripped, fill=TITLE_COLOR, font=title_font)
-                y += LINE_HEIGHT + 8
-
-            # 分隔线
-            elif stripped.startswith("━━"):
-                line_y = y + LINE_HEIGHT // 2
-                draw.line([(PAD_X, line_y), (width - PAD_X, line_y)], fill=SEP_COLOR, width=1)
-                y += LINE_HEIGHT
-
-            # section header (emoji开头)
-            elif any(stripped.startswith(c) for c in "📖🧘🎒💊🏪📦🏦📜🏛️⚔️📊🚶🌀🔥✨🏔️🌾💕👁️"):
-                y += HEADER_GAP
-                draw.rectangle([(PAD_X - 10, y - 2), (width - PAD_X + 10, y + LINE_HEIGHT - 2)],
-                              fill=(32, 34, 52))
-                draw.text((PAD_X, y), stripped, fill=HEADER_COLOR, font=header_font)
-                y += LINE_HEIGHT
-
-            # 底部信息
-            elif stripped.startswith("📋") or stripped.startswith("💡"):
-                y += HEADER_GAP
-                if stripped.startswith("💡"):
-                    bbox = draw.textbbox((0, 0), stripped, font=small_font)
-                    tw = bbox[2] - bbox[0]
-                    draw.text(((width - tw) / 2, y), stripped, fill=WARN_COLOR, font=small_font)
-                else:
-                    bbox = draw.textbbox((0, 0), stripped, font=small_font)
-                    tw = bbox[2] - bbox[0]
-                    draw.text(((width - tw) / 2, y), stripped, fill=DESC_COLOR, font=small_font)
-                y += LINE_HEIGHT
-
-            # 具体的指令/描述行
-            else:
-                indent = PAD_X
-                if stripped.startswith("└─"):
-                    indent = PAD_X + 30
-                    draw.text((indent, y), stripped, fill=DESC_COLOR, font=body_font)
-                elif stripped.startswith("⚠"):
-                    indent = PAD_X + 20
-                    draw.text((indent, y), stripped, fill=WARN_COLOR, font=body_font)
-                elif "─ " in stripped:
-                    # 指令名─描述 格式
-                    cmd, desc = stripped.split("─ ", 1)
-                    draw.text((indent, y), cmd.strip(), fill=CMD_COLOR, font=body_font)
-                    bbox = draw.textbbox((0, 0), cmd.strip(), font=body_font)
-                    cw = bbox[2] - bbox[0]
-                    draw.text((indent + cw + 10, y), "─ " + desc, fill=DESC_COLOR, font=body_font)
-                else:
-                    draw.text((indent, y), stripped, fill=CMD_COLOR, font=body_font)
-                y += LINE_HEIGHT
-
-        # 保存到插件目录（固定路径，每次覆盖）
-        from pathlib import Path
-        output_dir = Path(get_astrbot_data_path()) / "plugins" / "astrbot_plugin_monixiuxian2"
-        output_dir.mkdir(parents=True, exist_ok=True)
-        output_path = output_dir / "help_card.png"
-        img.save(str(output_path), format="PNG")
-
-        logger.info(f"【修仙插件】帮助图片已生成: {output_path} ({width}x{total_height})")
-        return str(output_path)
 
     def _draw_status_line(self, img, key, value, x, y, font, color):
         path = IMG_PATH / "line3.png"

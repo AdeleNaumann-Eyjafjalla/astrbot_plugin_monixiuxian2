@@ -1,6 +1,5 @@
 # handlers/misc_handler.py
 from astrbot.api.event import AstrMessageEvent
-from astrbot.api import logger
 from ..data import DataBase
 
 __all__ = ["MiscHandler"]
@@ -9,13 +8,11 @@ __all__ = ["MiscHandler"]
 class MiscHandler:
     """杂项指令处理器 - 提供帮助信息"""
 
-    def __init__(self, db: DataBase, image_generator=None):
+    def __init__(self, db: DataBase):
         self.db = db
-        self.image_generator = image_generator
 
     async def handle_help(self, event: AstrMessageEvent):
-        """显示帮助信息（优先图片，降级文本）"""
-        # 构建帮助文本
+        """显示帮助信息"""
         help_text = (
             "📖 修仙指令大全 v3.4.1\n"
             "━━━━━━━━━━━━━━━━━━━━━━\n"
@@ -257,14 +254,4 @@ class MiscHandler:
             "📋 共 19 个系统 · 97 条指令\n"
             "💡 所有指令前可加 / 使用，如 /我要修仙"
         )
-
-        # 尝试生成图片发送
-        if self.image_generator:
-            lines = help_text.split("\n")
-            img_path = await self.image_generator.generate_help_image(lines)
-            if img_path:
-                yield event.image_result(img_path)
-                return
-
-        # 降级为文本发送
         yield event.plain_result(help_text)
