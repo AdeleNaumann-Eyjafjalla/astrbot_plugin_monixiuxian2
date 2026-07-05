@@ -98,6 +98,30 @@
         "type": "int",
         "default": 100,
         "hint": "库存=物品权重/基数。基数越大，库存越少。"
+      },
+      "HP_REGEN_BASE_PER_MINUTE": {
+        "description": "战斗HP每分钟基础恢复量",
+        "type": "float",
+        "default": 5.0,
+        "hint": "每分钟恢复的战斗HP基础值。实际恢复量 = 基础值 × 灵根修炼速度倍率。灵根越好，回血越快。切磋/决斗/Boss战造成的HP损失仅通过此方式随时间恢复。"
+      },
+      "QI_COST_PER_MINUTE": {
+        "description": "灵修闭关每分钟消耗灵气",
+        "type": "float",
+        "default": 2.0,
+        "hint": "灵修玩家闭关修炼时每分钟消耗的灵气量。灵气不足时将无法继续获得修为。可通过回灵丹等恢复灵气的丹药补充。"
+      },
+      "BLOOD_COST_PER_MINUTE": {
+        "description": "体修闭关每分钟消耗气血",
+        "type": "float",
+        "default": 2.0,
+        "hint": "体修玩家闭关修炼时每分钟消耗的气血量。气血不足时将无法继续获得修为。可通过回血丹等恢复气血的丹药补充。"
+      },
+      "LOW_ENERGY_CULTIVATE_PENALTY": {
+        "description": "能量耗尽后修炼效率惩罚",
+        "type": "float",
+        "default": 0.1,
+        "hint": "灵气/气血耗尽后继续修炼的修为获得比例（0.1=10%效率）。设为0则能量耗尽后无法获得修为。"
       }
     }
   },

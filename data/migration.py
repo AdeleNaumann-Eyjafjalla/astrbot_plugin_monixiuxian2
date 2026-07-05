@@ -7,7 +7,7 @@ from typing import Dict, Callable, Awaitable
 from astrbot.api import logger
 from ..config_manager import ConfigManager
 
-LATEST_DB_VERSION = 21  # v21: 添加装备强化等级字段
+LATEST_DB_VERSION = 22  # v22: 添加HP恢复时间戳字段
 
 MIGRATION_TASKS: Dict[int, Callable[[aiosqlite.Connection, ConfigManager], Awaitable[None]]] = {}
 
@@ -318,6 +318,7 @@ async def _create_all_tables_v2(conn: aiosqlite.Connection):
             mp INTEGER NOT NULL DEFAULT 0,
             atk INTEGER NOT NULL DEFAULT 0,
             atkpractice INTEGER NOT NULL DEFAULT 0,
+            last_hp_regen_time INTEGER NOT NULL DEFAULT 0,
             sect_id INTEGER NOT NULL DEFAULT 0,
             sect_position INTEGER NOT NULL DEFAULT 4,
             sect_contribution INTEGER NOT NULL DEFAULT 0,
@@ -1027,3 +1028,13 @@ async def _migrate_to_v21(conn: aiosqlite.Connection, config_manager: ConfigMana
     
     await conn.commit()
     logger.info("v21迁移完成：添加装备强化等级字段")
+
+@migration(22)
+async def _migrate_to_v22(conn: aiosqlite.Connection, config_manager: ConfigManager):
+    """迁移到v22 - 添加HP恢复时间戳字段"""
+    logger.info("开始迁移到v22：添加HP恢复时间戳字段")
+
+    await safe_add_column(conn, "players", "last_hp_regen_time INTEGER NOT NULL DEFAULT 0")
+
+    await conn.commit()
+    logger.info("v22迁移完成：添加HP恢复时间戳字段")

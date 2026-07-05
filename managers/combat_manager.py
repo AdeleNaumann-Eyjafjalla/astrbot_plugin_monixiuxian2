@@ -186,12 +186,12 @@ class CombatManager:
             winner = "平局"
             combat_log.append(f"☆━━━━ 平局！━━━━☆")
         
-        # 如果是切磋，不消耗HP/MP
+        # 切磋同样扣HP，但不强制战败者降为1
         if combat_type == 1:
-            player1_final_hp = player1.max_hp
-            player1_final_mp = player1.max_mp
-            player2_final_hp = player2.max_hp
-            player2_final_mp = player2.max_mp
+            player1_final_hp = max(1, player1.hp)
+            player1_final_mp = player1.mp
+            player2_final_hp = max(1, player2.hp)
+            player2_final_mp = player2.mp
         else:
             # 决斗消耗HP/MP，战败者HP降为1
             player1_final_hp = max(1, player1.hp) if player1.hp > 0 else 1

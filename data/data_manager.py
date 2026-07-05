@@ -62,7 +62,7 @@ class DataBase:
                 user_id, level_index, spiritual_root,cultivation_type, user_name, lifespan,
                 experience, gold, state, cultivation_start_time, last_check_in_date, level_up_rate,
                 weapon, armor, main_technique, techniques,
-                hp, mp, atk, atkpractice,
+                hp, mp, atk, atkpractice, last_hp_regen_time,
                 spiritual_qi, max_spiritual_qi, blood_qi, max_blood_qi,
                 magic_damage, physical_damage, magic_defense, physical_defense, mental_power,
                 sect_id, sect_position, sect_contribution, sect_task, sect_elixir_get,
@@ -70,7 +70,7 @@ class DataBase:
                 active_pill_effects, permanent_pill_gains, has_resurrection_pill, has_debuff_shield, pills_inventory,
                 storage_ring, storage_ring_items,
                 daily_pill_usage, last_daily_reset, equipment_enhance
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 player.user_id,
@@ -93,6 +93,7 @@ class DataBase:
                 player.mp,
                 player.atk,
                 player.atkpractice,
+                player.last_hp_regen_time,
                 player.spiritual_qi,
                 player.max_spiritual_qi,
                 player.blood_qi,
@@ -172,6 +173,7 @@ class DataBase:
                 mp = ?,
                 atk = ?,
                 atkpractice = ?,
+                last_hp_regen_time = ?,
                 spiritual_qi = ?,
                 max_spiritual_qi = ?,
                 blood_qi = ?,
@@ -220,6 +222,7 @@ class DataBase:
                 player.mp,
                 player.atk,
                 player.atkpractice,
+                player.last_hp_regen_time,
                 player.spiritual_qi,
                 player.max_spiritual_qi,
                 player.blood_qi,

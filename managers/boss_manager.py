@@ -68,11 +68,12 @@ class BossManager:
         ],
     }
     
-    def __init__(self, db: DataBase, combat_mgr: CombatManager, config_manager=None, storage_ring_manager: "StorageRingManager" = None):
+    def __init__(self, db: DataBase, combat_mgr: CombatManager, config_manager=None, storage_ring_manager: "StorageRingManager" = None, plugin_config=None):
         self.db = db
         self.combat_mgr = combat_mgr
         self.storage_ring_manager = storage_ring_manager
         self.config = config_manager.boss_config if config_manager else {}
+        self.plugin_config = plugin_config  # AstrBotConfig（插件配置，含HP恢复等）
         self.levels = self.config.get("levels", self.BOSS_LEVELS)
     
     async def spawn_boss(
@@ -170,6 +171,11 @@ ATK：{atk}
         player = await self.db.get_player_by_id(user_id)
         if not player:
             return False, "❌ 你还未踏入修仙之路！", None
+
+        # 1.5. Boss战前HP随时间恢复
+        from ..utils.hp_regen import regenerate_player_hp
+        if self.plugin_config and self.config_manager:
+            await regenerate_player_hp(player, self.plugin_config, self.config_manager, self.db)
         
         # 2. 检查Boss是否存在
         boss = await self.db.ext.get_active_boss()

@@ -6,6 +6,7 @@ from astrbot.api.star import Context, Star, StarTools
 from astrbot.api.event import AstrMessageEvent, filter
 from .data import DataBase, MigrationManager
 from .config_manager import ConfigManager
+from .utils.hp_regen import regenerate_player_hp
 from .handlers import (
     MiscHandler, PlayerHandler, EquipmentHandler, BreakthroughHandler, 
     PillHandler, ShopHandler, StorageRingHandler,
@@ -200,7 +201,7 @@ class XiuXianPlugin(Star):
         
         self.combat_mgr = CombatManager()
         self.sect_mgr = SectManager(self.db, self.config_manager)
-        self.boss_mgr = BossManager(self.db, self.combat_mgr, self.config_manager, self.storage_ring_mgr)
+        self.boss_mgr = BossManager(self.db, self.combat_mgr, self.config_manager, self.storage_ring_mgr, self.config)
         self.rift_mgr = RiftManager(self.db, self.config_manager, self.storage_ring_mgr)
         self.rank_mgr = RankingManager(self.db, self.combat_mgr, self.config_manager)
         self.adventure_mgr = AdventureManager(self.db, self.storage_ring_mgr)
@@ -210,7 +211,7 @@ class XiuXianPlugin(Star):
         # 初始化新功能处理器
         self.sect_handlers = SectHandlers(self.db, self.sect_mgr)
         self.boss_handlers = BossHandlers(self.db, self.boss_mgr)
-        self.combat_handlers = CombatHandlers(self.db, self.combat_mgr, self.config_manager)
+        self.combat_handlers = CombatHandlers(self.db, self.combat_mgr, self.config_manager, self.config)
         self.ranking_handlers = RankingHandlers(self.db, self.rank_mgr)
         self.rift_handlers = RiftHandlers(self.db, self.rift_mgr)
         self.adventure_handlers = AdventureHandlers(self.db, self.adventure_mgr)
@@ -314,6 +315,7 @@ class XiuXianPlugin(Star):
         self.loan_check_task = asyncio.create_task(self._schedule_loan_check())
         self.spirit_eye_task = asyncio.create_task(self._schedule_spirit_eye_spawn())
         self.bounty_check_task = asyncio.create_task(self._schedule_bounty_check())
+        self.hp_regen_task = asyncio.create_task(self._schedule_hp_regen())
         
         logger.info("【修仙插件】已加载。")
 
@@ -349,6 +351,8 @@ class XiuXianPlugin(Star):
             self.spirit_eye_task.cancel()
         if self.bounty_check_task:
             self.bounty_check_task.cancel()
+        if self.hp_regen_task:
+            self.hp_regen_task.cancel()
         await self.db.close()
         logger.info("【修仙插件】已卸载。")
         
@@ -616,6 +620,39 @@ class XiuXianPlugin(Star):
                 break
             except Exception as e:
                 logger.error(f"悬赏检查任务异常: {e}")
+                await asyncio.sleep(60)
+
+    async def _schedule_hp_regen(self):
+        """HP定时恢复任务（每5分钟为所有在线/活跃玩家恢复HP）"""
+        while True:
+            try:
+                await self.db.ensure_connection()
+                await asyncio.sleep(300)  # 5分钟
+                
+                # 获取所有玩家
+                players = await self.db.get_all_players()
+                regen_count = 0
+                
+                for player in players:
+                    try:
+                        # 只恢复HP不满的玩家
+                        max_hp = player.experience // 2
+                        if player.hp >= max_hp:
+                            continue
+                        
+                        regened = await regenerate_player_hp(player, self.config, self.config_manager, self.db)
+                        if regened > 0:
+                            regen_count += 1
+                    except Exception:
+                        continue
+                
+                if regen_count > 0:
+                    logger.info(f"【修仙插件】定时HP恢复：{regen_count} 名玩家恢复了HP")
+                    
+            except asyncio.CancelledError:
+                break
+            except Exception as e:
+                logger.error(f"HP恢复任务异常: {e}")
                 await asyncio.sleep(60)
 
     async def _broadcast_spirit_eye_spawn(self, msg: str):
@@ -998,7 +1035,7 @@ class XiuXianPlugin(Star):
         async for r in self.combat_handlers.handle_duel(event, target):
             yield r
             
-    @filter.command(CMD_SPAR, "与其他玩家切磋(无消耗)")
+    @filter.command(CMD_SPAR, "与其他玩家切磋(消耗HP)")
     @require_whitelist
     async def handle_spar(self, event: AstrMessageEvent, target: str = ""):
         async for r in self.combat_handlers.handle_spar(event, target):

@@ -5,6 +5,7 @@ from astrbot.api.event import AstrMessageEvent
 from astrbot.api.all import *
 from ..managers.combat_manager import CombatManager, CombatStats
 from ..data.data_manager import DataBase
+from ..utils.hp_regen import regenerate_player_hp
 from .utils import player_required
 from ..models import Player
 from ..models_extended import UserStatus
@@ -14,10 +15,11 @@ DUEL_COOLDOWN = 300  # 决斗冷却5分钟
 SPAR_COOLDOWN = 60   # 切磋冷却1分钟
 
 class CombatHandlers:
-    def __init__(self, db: DataBase, combat_mgr: CombatManager, config_manager=None):
+    def __init__(self, db: DataBase, combat_mgr: CombatManager, config_manager=None, config=None):
         self.db = db
         self.combat_mgr = combat_mgr
         self.config_manager = config_manager
+        self.config = config
     
     async def _get_combat_cooldown(self, user_id: str) -> dict:
         """获取战斗冷却信息"""
@@ -184,6 +186,15 @@ class CombatHandlers:
             yield event.plain_result(f"❌ 决斗冷却中，还需 {remaining // 60} 分 {remaining % 60} 秒")
             return
 
+        # 战斗前HP随时间恢复
+        if self.config and self.config_manager:
+            p1 = await self.db.get_player_by_id(user_id)
+            p2 = await self.db.get_player_by_id(target_id)
+            if p1:
+                await regenerate_player_hp(p1, self.config, self.config_manager, self.db)
+            if p2:
+                await regenerate_player_hp(p2, self.config, self.config_manager, self.db)
+
         # 获取双方数据
         p1_stats = await self._prepare_combat_stats(user_id)
         p2_stats = await self._prepare_combat_stats(target_id)
@@ -245,6 +256,15 @@ class CombatHandlers:
             yield event.plain_result(f"❌ 切磋冷却中，还需 {remaining} 秒")
             return
 
+        # 切磋前HP随时间恢复
+        if self.config and self.config_manager:
+            p1 = await self.db.get_player_by_id(user_id)
+            p2 = await self.db.get_player_by_id(target_id)
+            if p1:
+                await regenerate_player_hp(p1, self.config, self.config_manager, self.db)
+            if p2:
+                await regenerate_player_hp(p2, self.config, self.config_manager, self.db)
+
         p1_stats = await self._prepare_combat_stats(user_id)
         p2_stats = await self._prepare_combat_stats(target_id)
         
@@ -253,6 +273,10 @@ class CombatHandlers:
              return
 
         result = self.combat_mgr.player_vs_player(p1_stats, p2_stats, combat_type=1) # 1=切磋
+        
+        # 切磋也消耗HP，保存到数据库（HP只能随时间恢复）
+        await self.db.ext.update_player_hp_mp(user_id, result['player1_final_hp'], result['player1_final_mp'])
+        await self.db.ext.update_player_hp_mp(target_id, result['player2_final_hp'], result['player2_final_mp'])
         
         # 更新冷却
         await self._update_combat_cooldown(user_id, "spar")

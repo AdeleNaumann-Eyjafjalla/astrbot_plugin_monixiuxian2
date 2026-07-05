@@ -9,6 +9,7 @@ from ..core import CultivationManager, PillManager
 from ..models import Player
 from ..models_extended import UserStatus
 from ..config_manager import ConfigManager
+from ..utils.hp_regen import regenerate_player_hp
 from .utils import player_required
 
 CMD_START_XIUXIAN = "我要修仙"
@@ -145,6 +146,10 @@ class PlayerHandler:
     async def handle_player_info(self, player: Player, event: AstrMessageEvent):
         """处理查看玩家信息 - 展示新属性"""
         display_name = event.get_sender_name()
+
+        # HP随时间自动恢复
+        await regenerate_player_hp(player, self.config, self.config_manager, self.db)
+
         required_exp = player.get_required_exp(self.config_manager)
 
         # 更新丹药效果并计算最终属性倍率
@@ -310,6 +315,38 @@ class PlayerHandler:
             yield event.plain_result(f"❌ 道友当前正{current_status}，无法闭关修炼！")
             return
 
+        # 检查修炼能量是否足够
+        if player.cultivation_type == "体修":
+            cost_per_min = float(self.config["VALUES"].get("BLOOD_COST_PER_MINUTE", 2.0))
+            current_energy = player.blood_qi
+            energy_name = "气血"
+        else:
+            cost_per_min = float(self.config["VALUES"].get("QI_COST_PER_MINUTE", 2.0))
+            current_energy = player.spiritual_qi
+            energy_name = "灵气"
+        
+        if current_energy <= 0:
+            yield event.plain_result(
+                f"❌ {energy_name}不足，无法闭关修炼！\n"
+                f"💡 请服用回{energy_name}丹补充{energy_name}后再来闭关。"
+            )
+            return
+        
+        # 计算可用闭关时长（能量相关）
+        energy_duration_minutes = int(current_energy / cost_per_min)
+        energy_duration_hours = energy_duration_minutes // 60
+        energy_duration_min = energy_duration_minutes % 60
+        energy_duration_str = ""
+        if energy_duration_hours > 0:
+            energy_duration_str += f"{energy_duration_hours}小时"
+        if energy_duration_min > 0:
+            energy_duration_str += f"{energy_duration_min}分钟"
+        
+        low_energy_penalty = float(self.config["VALUES"].get("LOW_ENERGY_CULTIVATE_PENALTY", 0.1))
+        low_energy_msg = ""
+        if low_energy_penalty > 0:
+            low_energy_msg = f"\n⚠️ {energy_name}耗尽后仍可获得 {int(low_energy_penalty * 100)}% 修为"
+        
         # 记录闭关开始时间
         player.state = "修炼中"
         player.cultivation_start_time = int(time.time())
@@ -320,13 +357,17 @@ class PlayerHandler:
             "🧘 道友已进入闭关状态\n"
             "━━━━━━━━━━━━━━━\n"
             "闭关期间，你将与世隔绝，潜心修炼。\n"
+            f"🔮 当前{energy_name}：{current_energy} → 可支撑约 {energy_duration_str}\n"
             f"💡 发送「{CMD_END_CULTIVATION}」结束闭关\n"
-            "⏱️ 每分钟将获得修为，受灵根资质影响。"
+            f"⏱️ 每分钟获得修为（受灵根资质影响），消耗{energy_name}{cost_per_min}点{low_energy_msg}"
         )
 
     @player_required
     async def handle_end_cultivation(self, player: Player, event: AstrMessageEvent):
         """处理出关指令"""
+        # HP随时间自动恢复（出关时触发）
+        await regenerate_player_hp(player, self.config, self.config_manager, self.db)
+
         # 检查是否在闭关中
         if player.state != "修炼中":
             yield event.plain_result("道友当前并未闭关，无需出关。")
@@ -351,6 +392,22 @@ class PlayerHandler:
         MAX_CULTIVATION_MINUTES = base_minutes + player.level_index * 60
         effective_minutes = min(duration_minutes, MAX_CULTIVATION_MINUTES)
         exceeded_time = duration_minutes > MAX_CULTIVATION_MINUTES
+
+        # 修炼能量消耗约束：灵修消耗灵气，体修消耗气血
+        if player.cultivation_type == "体修":
+            cost_per_min = float(self.config["VALUES"].get("BLOOD_COST_PER_MINUTE", 2.0))
+            current_energy = player.blood_qi
+            energy_name = "气血"
+        else:
+            cost_per_min = float(self.config["VALUES"].get("QI_COST_PER_MINUTE", 2.0))
+            current_energy = player.spiritual_qi
+            energy_name = "灵气"
+        
+        energy_minutes = int(current_energy / cost_per_min) if current_energy > 0 else 0
+        energy_effective = min(effective_minutes, max(energy_minutes, 0))
+        excess_minutes = max(0, effective_minutes - energy_effective)
+        penalty_rate = float(self.config["VALUES"].get("LOW_ENERGY_CULTIVATE_PENALTY", 0.1))
+        energy_depleted = excess_minutes > 0
 
         # 获取主修心法的修为加成
         technique_bonus = 0.0
@@ -442,8 +499,19 @@ class PlayerHandler:
         # 更新丹药效果（处理过期效果和周期性效果）
         await self.pill_manager.update_temporary_effects(player)
         
-        # 计算获得的修为
+        # 计算获得的修为（能量不足时部分打折）
         gained_exp = total_exp
+        energy_consumed = min(current_energy, int(effective_minutes * cost_per_min))
+        if energy_depleted and effective_minutes > 0:
+            full_ratio = energy_effective / effective_minutes
+            excess_ratio = excess_minutes / effective_minutes
+            gained_exp = int(total_exp * full_ratio + total_exp * excess_ratio * penalty_rate)
+
+        # 扣除修炼能量
+        if player.cultivation_type == "体修":
+            player.blood_qi = max(0, player.blood_qi - energy_consumed)
+        else:
+            player.spiritual_qi = max(0, player.spiritual_qi - energy_consumed)
 
         # 更新玩家数据
         player.experience += gained_exp
@@ -467,12 +535,17 @@ class PlayerHandler:
             effective_hours = MAX_CULTIVATION_MINUTES // 60
             exceed_msg = f"\n⚠️ 闭关超过{effective_hours}小时，仅计算前{effective_hours}小时修为"
 
+        # 能量消耗提示
+        energy_msg = f"\n🔮 消耗{energy_name}：{energy_consumed} → 剩余{energy_name}：{player.spiritual_qi if player.cultivation_type != '体修' else player.blood_qi}"
+        if energy_depleted:
+            energy_msg += f"\n⚠️ {energy_name}不足，超出部分的修为仅获得 {int(penalty_rate * 100)}% 效率"
+
         reply_msg = (
             "🌟 道友出关成功！\n"
             "━━━━━━━━━━━━━━━\n"
             f"⏱️ 闭关时长：{time_str}\n"
             f"📈 获得修为：{gained_exp:,}{exceed_msg}\n"
-            f"💫 当前修为：{player.experience:,}\n"
+            f"💫 当前修为：{player.experience:,}{energy_msg}\n"
             "━━━━━━━━━━━━━━━\n"
             "道友已回归红尘，可继续修行。"
         )

@@ -108,6 +108,7 @@ class Player:
     mp: int = 0  # 当前真元值
     atk: int = 0  # 攻击力
     atkpractice: int = 0  # 攻击修炼等级，每级提升4%攻击力
+    last_hp_regen_time: int = 0  # 上次HP恢复时间戳（Unix时间戳）
 
     # 灵修/体修专用属性
     spiritual_qi: int = 100  # 当前灵气（灵修专用）

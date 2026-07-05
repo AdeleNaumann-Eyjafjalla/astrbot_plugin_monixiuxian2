@@ -414,6 +414,14 @@ class DatabaseExtended:
             (hp, mp, user_id)
         )
         await self.conn.commit()
+
+    async def update_player_hp_regen_time(self, user_id: str, timestamp: int):
+        """更新玩家上次HP恢复时间戳"""
+        await self.conn.execute(
+            "UPDATE players SET last_hp_regen_time = ? WHERE user_id = ?",
+            (timestamp, user_id)
+        )
+        await self.conn.commit()
     
     async def update_player_sect_info(self, user_id: str, sect_id: int, sect_position: int):
         """更新玩家宗门信息"""
