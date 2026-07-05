@@ -1,6 +1,7 @@
 # core/pill_manager.py
 
 import time
+from datetime import datetime
 from typing import Dict, List, Optional, Tuple
 from astrbot.api import logger
 
@@ -110,8 +111,14 @@ class PillManager:
         Returns:
             (是否成功, 消息)
         """
-        # 检查每日使用次数限制（daily_pill_usage 为 JSON 字符串）
+        # 跨日自动重置：如果 last_daily_reset 不是今天，自动清零计数
+        today_str = datetime.now().strftime("%Y-%m-%d")
         import json
+        if player.last_daily_reset != today_str:
+            player.daily_pill_usage = "{}"
+            player.last_daily_reset = today_str
+
+        # 检查每日使用次数限制（daily_pill_usage 为 JSON 字符串）
         usage = {}
         try:
             usage = json.loads(player.daily_pill_usage) if player.daily_pill_usage else {}

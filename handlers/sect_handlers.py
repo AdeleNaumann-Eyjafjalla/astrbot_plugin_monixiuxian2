@@ -138,3 +138,18 @@ class SectHandlers:
         user_id = event.get_sender_id()
         success, msg = await self.sect_mgr.perform_sect_task(user_id)
         yield event.plain_result(msg)
+
+    async def handle_sect_exchange_list(self, event: AstrMessageEvent):
+        """查看宗门贡献可兑换列表"""
+        user_id = event.get_sender_id()
+        success, msg = await self.sect_mgr.get_sect_exchange_list(user_id)
+        yield event.plain_result(msg)
+
+    async def handle_sect_exchange(self, event: AstrMessageEvent, pill_name: str = ""):
+        """宗门贡献兑换破境丹"""
+        if not pill_name or pill_name.strip() == "":
+            yield event.plain_result("请指定要兑换的丹药名称，例如：/宗门兑换 筑基丹")
+            return
+        user_id = event.get_sender_id()
+        success, msg = await self.sect_mgr.exchange_breakthrough_pill(user_id, pill_name.strip())
+        yield event.plain_result(msg)

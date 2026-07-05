@@ -16,7 +16,7 @@ class ShopHandler:
     """商店处理器"""
     
     ITEM_ACQUIRE_HINTS = {
-        'pill': "丹阁刷新、秘境稀有掉落",
+        'pill': "丹阁(保底2位)、天机阁直售、宗门丹房兑换、炼丹、Boss掉落、百宝阁",
         'exp_pill': "丹阁、炼丹系统、历练/秘境奖励",
         'utility_pill': "丹阁稀有、秘境/Boss 掉落",
         'legacy_pill': "百宝阁限量，购买后立即生效",
@@ -42,27 +42,37 @@ class ShopHandler:
             for user_id in access_control.get("SHOP_MANAGERS", [])
         }
 
-    async def _ensure_pavilion_refreshed(self, pavilion_id: str, item_getter, count: int) -> None:
+    async def _ensure_pavilion_refreshed(self, pavilion_id: str, item_getter, count: int,
+                                          guarantee_count: int = 0, guarantee_pool: list = None) -> None:
         """确保阁楼已刷新"""
         last_refresh_time, current_items = await self.db.get_shop_data(pavilion_id)
         if current_items:
             updated = self.shop_manager.ensure_items_have_stock(current_items)
             if updated:
                 await self.db.update_shop_data(pavilion_id, last_refresh_time, current_items)
-        refresh_hours = self.config.get("PAVILION_REFRESH_HOURS", 6)
+        refresh_hours = self.config.get("PAVILION_REFRESH_HOURS", 0.5)
         if not current_items or self.shop_manager.should_refresh_shop(last_refresh_time, refresh_hours):
-            new_items = self.shop_manager.generate_pavilion_items(item_getter, count)
+            new_items = self.shop_manager.generate_pavilion_items(
+                item_getter, count, guarantee_count=guarantee_count, guarantee_pool=guarantee_pool
+            )
             await self.db.update_shop_data(pavilion_id, int(time.time()), new_items)
 
     async def handle_pill_pavilion(self, event: AstrMessageEvent):
-        """处理丹阁命令 - 展示丹药列表"""
+        """处理丹阁命令 - 展示丹药列表（保证至少2个破境丹专属位）"""
         count = self.config.get("PAVILION_PILL_COUNT", 10)
-        await self._ensure_pavilion_refreshed("pill_pavilion", self.shop_manager.get_pills_for_display, count)
+        # 获取破境丹保底池（所有破境丹）
+        pills_pool = self.shop_manager.get_pills_guaranteed_breakthrough(count)
+        breakthrough_pool = [p for p in pills_pool if p['type'] == 'pill']
+        # 使用带保底的方法刷新，保证至少2个破境丹
+        await self._ensure_pavilion_refreshed(
+            "pill_pavilion", self.shop_manager.get_pills_guaranteed_breakthrough,
+            count, guarantee_count=2, guarantee_pool=breakthrough_pool
+        )
         last_refresh, items = await self.db.get_shop_data("pill_pavilion")
         if not items:
             yield event.plain_result("丹阁暂无丹药出售。")
             return
-        refresh_hours = self.config.get("PAVILION_REFRESH_HOURS", 6)
+        refresh_hours = self.config.get("PAVILION_REFRESH_HOURS", 0.5)
         display = self.shop_manager.format_pavilion_display("丹阁", items, refresh_hours, last_refresh)
         yield event.plain_result(display)
 
@@ -74,7 +84,7 @@ class ShopHandler:
         if not items:
             yield event.plain_result("器阁暂无武器出售。")
             return
-        refresh_hours = self.config.get("PAVILION_REFRESH_HOURS", 6)
+        refresh_hours = self.config.get("PAVILION_REFRESH_HOURS", 0.5)
         display = self.shop_manager.format_pavilion_display("器阁", items, refresh_hours, last_refresh)
         yield event.plain_result(display)
 
@@ -86,18 +96,34 @@ class ShopHandler:
         if not items:
             yield event.plain_result("百宝阁暂无物品出售。")
             return
-        refresh_hours = self.config.get("PAVILION_REFRESH_HOURS", 6)
+        refresh_hours = self.config.get("PAVILION_REFRESH_HOURS", 0.5)
         display = self.shop_manager.format_pavilion_display("百宝阁", items, refresh_hours, last_refresh)
         yield event.plain_result(display)
 
+    @player_required
+    async def handle_tianji_pavilion(self, player: Player, event: AstrMessageEvent):
+        """处理天机阁命令 - 破境丹NPC直售兜底"""
+        display = self.shop_manager.format_direct_sale_display(player.level_index)
+        yield event.plain_result(display)
+
     async def _find_item_in_pavilions(self, item_name: str):
-        """在所有阁楼中查找物品"""
+        """在所有阁楼中查找物品（含天机阁直售）"""
         for pavilion_id in ["pill_pavilion", "weapon_pavilion", "treasure_pavilion"]:
             _, items = await self.db.get_shop_data(pavilion_id)
             if items:
                 for item in items:
                     if item['name'] == item_name and item.get('stock', 0) > 0:
                         return pavilion_id, item
+        # 天机阁兜底：查找破境丹直售
+        dsp = self.shop_manager.get_direct_sale_pills()
+        for item in dsp:
+            if item['name'] == item_name:
+                # 天机阁无限库存
+                tianji_item = item.copy()
+                tianji_item['stock'] = 999
+                tianji_item['discount'] = 1.0
+                tianji_item['original_price'] = item['price']
+                return "tianji_pavilion", tianji_item
         return None, None
 
     @player_required
@@ -171,11 +197,16 @@ class ShopHandler:
                 )
                 return
 
-            reserved, _, remaining = await self.db.decrement_shop_item_stock(pavilion_id, item_name, quantity, external_transaction=True)
-            if not reserved:
-                await self.db.conn.rollback()
-                yield event.plain_result(f"【{item_name}】已售罄，请等待刷新。")
-                return
+            # 天机阁无限库存，不减库存；其他阁楼需扣除库存
+            if pavilion_id != "tianji_pavilion":
+                reserved, _, remaining = await self.db.decrement_shop_item_stock(pavilion_id, item_name, quantity, external_transaction=True)
+                if not reserved:
+                    await self.db.conn.rollback()
+                    yield event.plain_result(f"【{item_name}】已售罄，请等待刷新。")
+                    return
+                remaining_after = remaining
+            else:
+                remaining_after = 999
 
             if item_type in ['weapon', 'armor', 'main_technique', 'technique', 'accessory']:
                 success, msg = await self.storage_ring_manager.store_item(player, target_item['name'], quantity, external_transaction=True)
@@ -224,7 +255,10 @@ class ShopHandler:
             await self.db.conn.commit()
             
             result_lines.append(f"花费灵石: {total_price}，剩余: {player.gold}")
-            result_lines.append(f"剩余库存: {remaining}" if remaining > 0 else "该物品已售罄！")
+            if pavilion_id != "tianji_pavilion":
+                result_lines.append(f"剩余库存: {remaining_after}" if remaining_after > 0 else "该物品已售罄！")
+            else:
+                result_lines.append("💡 天机阁无限供应，随时可再次购买")
             yield event.plain_result("\n".join(result_lines))
         except Exception as e:
             await self.db.conn.rollback()

@@ -40,6 +40,7 @@ class SectManager:
     
     def __init__(self, db: DataBase, config_manager=None):
         self.db = db
+        self.config_manager = config_manager
         self.config = config_manager.sect_config if config_manager else {}
     
     def _validate_sect_name(self, name: str) -> Tuple[bool, str]:
@@ -527,6 +528,79 @@ class SectManager:
         await self.db.ext.update_user_cd(user_cd)
         
         return True, f"✨ 完成宗门任务！\n获得贡献：{contribution_gain}\n宗门资材：+{stone_gain}\n今日任务次数：{player.sect_task}"
+
+    # 宗门贡献可兑换的破境丹列表（贡献值 = 商店原价 / 10）
+    SECT_EXCHANGE_PILLS = [
+        {"name": "筑基丹", "target_level": 10, "cost": 500},
+        {"name": "结丹丹", "target_level": 13, "cost": 1500},
+        {"name": "凝婴丹", "target_level": 16, "cost": 5000},
+        {"name": "化神丹", "target_level": 19, "cost": 20000},
+        {"name": "炼虚丹", "target_level": 22, "cost": 80000},
+        {"name": "合体丹", "target_level": 25, "cost": 300000},
+        {"name": "大乘丹", "target_level": 28, "cost": 1000000},
+        {"name": "渡劫丹", "target_level": 31, "cost": 5000000},
+    ]
+
+    async def get_sect_exchange_list(self, user_id: str) -> Tuple[bool, str]:
+        """查看宗门贡献可兑换的破境丹列表"""
+        player = await self.db.get_player_by_id(user_id)
+        if not player or player.sect_id == 0:
+            return False, "❌ 你还未加入宗门！"
+
+        lines = ["🏛️ 宗门丹房 — 贡献兑换破境丹", "━━━━━━━━━━━━━━━", ""]
+        for pill in self.SECT_EXCHANGE_PILLS:
+            can_buy = "✅" if player.sect_contribution >= pill["cost"] else "❌"
+            lines.append(
+                f"{can_buy} {pill['name']}: {pill['cost']:,} 贡献 "
+                f"(突破至 {self._format_level_name(pill['target_level'])})"
+            )
+        lines.extend([
+            "",
+            f"你的贡献: {player.sect_contribution:,}",
+            "使用 /宗门兑换 <丹药名> 兑换破境丹"
+        ])
+        return True, "\n".join(lines)
+
+    async def exchange_breakthrough_pill(self, user_id: str, pill_name: str) -> Tuple[bool, str]:
+        """使用宗门贡献兑换破境丹"""
+        player = await self.db.get_player_by_id(user_id)
+        if not player or player.sect_id == 0:
+            return False, "❌ 你还未加入宗门！"
+
+        # 查找丹药
+        pill_config = None
+        for pill in self.SECT_EXCHANGE_PILLS:
+            if pill["name"] == pill_name:
+                pill_config = pill
+                break
+
+        if not pill_config:
+            # 构建可选名称列表
+            names = ", ".join(p["name"] for p in self.SECT_EXCHANGE_PILLS)
+            return False, f"❌ 宗门丹房暂不提供【{pill_name}】！\n可兑换: {names}"
+
+        if player.sect_contribution < pill_config["cost"]:
+            return False, f"❌ 贡献不足！需要 {pill_config['cost']:,} 贡献，你当前有 {player.sect_contribution:,}。"
+
+        # 扣除贡献
+        player.sect_contribution -= pill_config["cost"]
+
+        # 将丹药存入丹药背包
+        inventory = player.get_pills_inventory()
+        inventory[pill_name] = inventory.get(pill_name, 0) + 1
+        player.set_pills_inventory(inventory)
+
+        await self.db.update_player(player)
+
+        return True, f"✨ 兑换成功！消耗 {pill_config['cost']:,} 贡献获得【{pill_name}】x1\n剩余贡献: {player.sect_contribution:,}"
+
+    def _format_level_name(self, level_index: int) -> str:
+        """将 level_index 转为境界名称"""
+        if hasattr(self, 'config_manager') and self.config_manager:
+            level_data = getattr(self.config_manager, 'level_data', None)
+            if level_data and 0 <= level_index < len(level_data):
+                return level_data[level_index].get("level_name", f"Lv.{level_index}")
+        return f"Lv.{level_index}"
 
     async def handle_owner_death(self, sect_id: int, dead_owner_id: str) -> Tuple[bool, str]:
         """处理宗主死亡，自动传位或解散宗门"""

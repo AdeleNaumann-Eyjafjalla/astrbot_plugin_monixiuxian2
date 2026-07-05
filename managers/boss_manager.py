@@ -41,22 +41,30 @@ class BossManager:
     # Boss物品掉落表
     BOSS_DROP_TABLE = {
         "low": [  # 低级Boss (练气-金丹)
-            {"name": "灵兽内丹", "weight": 40, "min": 1, "max": 2},
-            {"name": "妖兽精血", "weight": 30, "min": 1, "max": 3},
-            {"name": "玄铁", "weight": 30, "min": 3, "max": 6},
+            {"name": "灵兽内丹", "weight": 35, "min": 1, "max": 2},
+            {"name": "妖兽精血", "weight": 20, "min": 1, "max": 3},
+            {"name": "玄铁", "weight": 20, "min": 3, "max": 6},
+            {"name": "筑基丹", "weight": 15, "min": 1, "max": 1},  # 破境丹掉落
+            {"name": "结丹丹", "weight": 10, "min": 1, "max": 1},
         ],
         "mid": [  # 中级Boss (元婴-化神)
-            {"name": "灵兽内丹", "weight": 30, "min": 2, "max": 4},
-            {"name": "星辰石", "weight": 25, "min": 2, "max": 4},
-            {"name": "天材地宝", "weight": 20, "min": 1, "max": 2},
-            {"name": "功法残页", "weight": 25, "min": 1, "max": 2},
+            {"name": "灵兽内丹", "weight": 25, "min": 2, "max": 4},
+            {"name": "星辰石", "weight": 20, "min": 2, "max": 4},
+            {"name": "天材地宝", "weight": 15, "min": 1, "max": 2},
+            {"name": "功法残页", "weight": 15, "min": 1, "max": 2},
+            {"name": "凝婴丹", "weight": 15, "min": 1, "max": 1},  # 破境丹掉落
+            {"name": "化神丹", "weight": 10, "min": 1, "max": 1},
         ],
         "high": [  # 高级Boss (炼虚及以上)
-            {"name": "天材地宝", "weight": 30, "min": 2, "max": 4},
-            {"name": "混沌精华", "weight": 25, "min": 1, "max": 2},
-            {"name": "神兽之骨", "weight": 20, "min": 1, "max": 1},
-            {"name": "远古秘籍", "weight": 15, "min": 1, "max": 1},
+            {"name": "天材地宝", "weight": 20, "min": 2, "max": 4},
+            {"name": "混沌精华", "weight": 15, "min": 1, "max": 2},
+            {"name": "神兽之骨", "weight": 15, "min": 1, "max": 1},
+            {"name": "远古秘籍", "weight": 10, "min": 1, "max": 1},
             {"name": "仙器碎片", "weight": 10, "min": 1, "max": 1},
+            {"name": "炼虚丹", "weight": 12, "min": 1, "max": 1},  # 破境丹掉落
+            {"name": "合体丹", "weight": 10, "min": 1, "max": 1},
+            {"name": "大乘丹", "weight": 5, "min": 1, "max": 1},
+            {"name": "渡劫丹", "weight": 3, "min": 1, "max": 1},
         ],
     }
     
@@ -248,19 +256,28 @@ ATK：{atk}
             
             # 物品掉落（store_item 内部独立提交，不会冲突）
             item_msg = ""
-            dropped_items = []
             if self.storage_ring_manager:
-                dropped_items = await self._roll_boss_drops(player, boss)
-                if dropped_items:
-                    item_lines = []
-                    for item_name, count in dropped_items:
-                        success, _ = await self.storage_ring_manager.store_item(player, item_name, count, silent=True)
-                        if success:
-                            item_lines.append(f"  · {item_name} x{count}")
-                        else:
-                            item_lines.append(f"  · {item_name} x{count}（储物戒已满，丢失）")
-                    if item_lines:
-                        item_msg = "\n\n📦 获得物品：\n" + "\n".join(item_lines)
+                material_drops, pill_drops = await self._roll_boss_drops(player, boss)
+                item_lines = []
+
+                # 处理普通物品（存入储物戒）
+                for item_name, count in material_drops:
+                    success, _ = await self.storage_ring_manager.store_item(player, item_name, count, silent=True)
+                    if success:
+                        item_lines.append(f"  · {item_name} x{count}")
+                    else:
+                        item_lines.append(f"  · {item_name} x{count}（储物戒已满，丢失）")
+
+                # 处理丹药掉落（存入丹药背包）
+                if pill_drops:
+                    inventory = player.get_pills_inventory()
+                    for item_name, count in pill_drops:
+                        inventory[item_name] = inventory.get(item_name, 0) + count
+                        item_lines.append(f"  · 💊 {item_name} x{count}（已加入丹药背包）")
+                    player.set_pills_inventory(inventory)
+
+                if item_lines:
+                    item_msg = "\n\n📦 获得物品：\n" + "\n".join(item_lines)
             
             result_msg = f"""
 🎉 挑战成功！
@@ -378,45 +395,52 @@ ATK：{boss.atk}
         # 生成Boss
         return await self.spawn_boss(base_exp, level_config)
     
-    async def _roll_boss_drops(self, player: Player, boss: Boss) -> List[Tuple[str, int]]:
+    async def _roll_boss_drops(self, player: Player, boss: Boss) -> Tuple[List[Tuple[str, int]], List[Tuple[str, int]]]:
         """
         根据Boss等级随机掉落物品
-        
+
         Args:
             player: 玩家对象
             boss: Boss对象
-            
+
         Returns:
-            掉落物品列表 [(物品名, 数量), ...]
+            (普通物品掉落列表, 丹药掉落列表) 每个列表元素为 [(物品名, 数量), ...]
         """
-        dropped_items = []
-        
+        # 丹药名称集合（用于区分普通物品和丹药）
+        PILL_NAMES = {"筑基丹", "结丹丹", "凝婴丹", "化神丹", "炼虚丹", "合体丹", "大乘丹", "渡劫丹"}
+
+        item_drops = []
+        pill_drops = []
+
         # 根据Boss等级确定掉落表
         boss_level_index = 0
         for level in self.levels:
             if level["name"] == boss.boss_level:
                 boss_level_index = level["level_index"]
                 break
-        
+
         if boss_level_index <= 6:  # 练气-金丹
             drop_table = self.BOSS_DROP_TABLE["low"]
         elif boss_level_index <= 12:  # 元婴-化神
             drop_table = self.BOSS_DROP_TABLE["mid"]
         else:  # 炼虚及以上
             drop_table = self.BOSS_DROP_TABLE["high"]
-        
+
         # Boss击杀100%掉落至少1件物品
         total_weight = sum(item["weight"] for item in drop_table)
         roll = random.randint(1, total_weight)
-        
+
         current_weight = 0
         for item in drop_table:
             current_weight += item["weight"]
             if roll <= current_weight:
                 count = random.randint(item["min"], item["max"])
-                dropped_items.append((item["name"], count))
+                if item["name"] in PILL_NAMES:
+                    pill_drops.append((item["name"], count))
+                else:
+                    item_drops.append((item["name"], count))
                 break
-        
+
         # 高级Boss有70%概率额外掉落
         if boss_level_index >= 9:  # 元婴及以上
             extra_chance = 50 if boss_level_index < 15 else 70
@@ -427,7 +451,10 @@ ATK：{boss.atk}
                     current_weight += item["weight"]
                     if roll <= current_weight:
                         count = random.randint(item["min"], item["max"])
-                        dropped_items.append((item["name"], count))
+                        if item["name"] in PILL_NAMES:
+                            pill_drops.append((item["name"], count))
+                        else:
+                            item_drops.append((item["name"], count))
                         break
-        
-        return dropped_items
+
+        return item_drops, pill_drops

@@ -59,9 +59,9 @@
       },
       "PAVILION_REFRESH_HOURS": {
         "description": "阁楼刷新时间（小时）",
-        "type": "int",
-        "default": 6,
-        "hint": "丹阁、器阁、百宝阁自动刷新的间隔时间（小时）。设置为0则不自动刷新。"
+        "type": "float",
+        "default": 0.5,
+        "hint": "丹阁、器阁、百宝阁自动刷新的间隔时间（小时）。0.5=30分钟。设置为0则不自动刷新。"
       },
       "PAVILION_PILL_COUNT": {
         "description": "丹阁展示数量",

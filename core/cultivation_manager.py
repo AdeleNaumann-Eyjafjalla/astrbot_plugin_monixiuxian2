@@ -273,16 +273,21 @@ class CultivationManager:
         }
         return descriptions.get(root_name, "【未知】神秘的灵根")
 
-    def generate_new_player_stats(self, user_id: str, cultivation_type: str = "灵修") -> Player:
+    def generate_new_player_stats(self, user_id: str, cultivation_type: str = "灵修",
+                                   spiritual_root: str = None) -> Player:
         """生成新玩家的初始数据（从境界配置读取基础属性，附加少量随机波动）
 
         Args:
             user_id: 用户ID
             cultivation_type: 修炼类型，"灵修"或"体修"
+            spiritual_root: 指定灵根（如"金灵根"），None则随机抽取
         """
         import random
 
-        root = self._get_random_spiritual_root()
+        if spiritual_root:
+            root = spiritual_root.replace("灵根", "")
+        else:
+            root = self._get_random_spiritual_root()
         initial_gold = self.config["VALUES"]["INITIAL_GOLD"]
 
         # 从境界配置读取 level_index=0 的基础属性

@@ -51,6 +51,7 @@ CMD_PILL_INFO = "丹药信息"
 CMD_PILL_PAVILION = "丹阁"
 CMD_WEAPON_PAVILION = "器阁"
 CMD_TREASURE_PAVILION = "百宝阁"
+CMD_TIANJI_PAVILION = "天机阁"
 CMD_ITEM_INFO = "物品信息"
 CMD_BUY = "购买"
 CMD_STORAGE_RING = "储物戒"
@@ -75,6 +76,8 @@ CMD_SECT_KICK = "踢出成员"
 CMD_SECT_TRANSFER = "宗主传位"
 CMD_SECT_TASK = "宗门任务"
 CMD_SECT_POSITION = "职位变更"
+CMD_SECT_EXCHANGE = "宗门兑换"
+CMD_SECT_EXCHANGE_LIST = "宗门丹房"
 
 # Boss系统指令
 CMD_BOSS_INFO = "世界Boss"
@@ -718,6 +721,12 @@ class XiuXianPlugin(Star):
         async for r in self.shop_handler.handle_treasure_pavilion(event):
             yield r
 
+    @filter.command(CMD_TIANJI_PAVILION, "天机阁破境丹直售(原价无限量)")
+    @require_whitelist
+    async def handle_tianji_pavilion(self, event: AstrMessageEvent):
+        async for r in self.shop_handler.handle_tianji_pavilion(event):
+            yield r
+
     @filter.command(CMD_ITEM_INFO, "查看物品详细效果")
     @require_whitelist
     async def handle_item_info(self, event: AstrMessageEvent, item_name: str = ""):
@@ -826,6 +835,18 @@ class XiuXianPlugin(Star):
     @require_whitelist
     async def handle_sect_task(self, event: AstrMessageEvent):
         async for r in self.sect_handlers.handle_sect_task(event):
+            yield r
+
+    @filter.command(CMD_SECT_EXCHANGE_LIST, "查看宗门丹房可兑换的破境丹")
+    @require_whitelist
+    async def handle_sect_exchange_list(self, event: AstrMessageEvent):
+        async for r in self.sect_handlers.handle_sect_exchange_list(event):
+            yield r
+
+    @filter.command(CMD_SECT_EXCHANGE, "使用宗门贡献兑换破境丹")
+    @require_whitelist
+    async def handle_sect_exchange(self, event: AstrMessageEvent, pill_name: str = ""):
+        async for r in self.sect_handlers.handle_sect_exchange(event, pill_name):
             yield r
 
     @filter.command(CMD_SECT_LIST, "查看宗门列表")

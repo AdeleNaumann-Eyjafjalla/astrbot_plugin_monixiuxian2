@@ -68,28 +68,59 @@ class PlayerHandler:
                 "⚠️ 修仙风险警告 ⚠️\n"
                 "• 突破失败有概率走火入魔身死道消\n"
                 "• 生命值归零也会导致死亡\n"
-                "• 死亡后所有数据清除，需重新入仙途\n"
+                "• 死亡后可使用「我要修仙 灵修 继承」保留灵根\n"
                 "━━━━━━━━━━━━━━━\n"
                 f"💡 使用方法：\n"
                 f"  {CMD_START_XIUXIAN} 灵修\n"
-                f"  {CMD_START_XIUXIAN} 体修"
+                f"  {CMD_START_XIUXIAN} 体修\n"
+                f"  {CMD_START_XIUXIAN} 灵修 继承  ← 保留死亡前的灵根"
             )
             yield event.plain_result(help_msg)
             return
 
+        # 解析参数：支持 "灵修"、"体修"、"灵修 继承"、"体修 继承"
+        raw_input = cultivation_type.strip() if cultivation_type else ""
+        inherit = False
+        if "继承" in raw_input:
+            inherit = True
+            raw_input = raw_input.replace("继承", "").strip()
+
         # 验证职业类型
-        cultivation_type = cultivation_type.strip()
+        cultivation_type = raw_input
         if cultivation_type not in ["灵修", "体修"]:
-            yield event.plain_result(f"职业选择错误！请选择「灵修」或「体修」。")
+            yield event.plain_result(f"职业选择错误！请选择「灵修」或「体修」。"
+                                     f"\n💡 可追加「继承」保留死亡前的灵根，如：我要修仙 灵修 继承")
             return
 
+        # 继承灵根：从系统配置读取死亡时保存的灵根
+        inherited_root = None
+        if inherit:
+            try:
+                inherited_root = await self.db.ext.get_system_config(f"dead_root_{user_id}")
+            except Exception:
+                pass
+            if not inherited_root:
+                yield event.plain_result("❌ 未找到可继承的灵根记录，将随机分配灵根。")
+            else:
+                # 清理系统配置
+                try:
+                    await self.db.ext.set_system_config(f"dead_root_{user_id}", "")
+                except Exception:
+                    pass
+
         # 生成新玩家
-        new_player = self.cultivation_manager.generate_new_player_stats(user_id, cultivation_type)
+        new_player = self.cultivation_manager.generate_new_player_stats(
+            user_id, cultivation_type, spiritual_root=inherited_root
+        )
         await self.db.create_player(new_player)
 
         # 获取灵根描述
         root_name = new_player.spiritual_root.replace("灵根", "")
         root_description = self.cultivation_manager._get_root_description(root_name)
+
+        inherit_line = ""
+        if inherited_root:
+            inherit_line = "🔄 继承灵根：保留了死亡前的灵根\n"
 
         reply_msg = (
             f"🎉 恭喜道友 {event.get_sender_name()} 踏上仙途！\n"
@@ -97,6 +128,7 @@ class PlayerHandler:
             f"修炼方式：【{new_player.cultivation_type}】\n"
             f"灵根：【{new_player.spiritual_root}】\n"
             f"评价：{root_description}\n"
+            f"{inherit_line}"
             f"启动资金：{new_player.gold} 灵石\n"
             f"━━━━━━━━━━━━━━━\n"
             f"⚠️ 修仙有风险，突破需谨慎！\n"

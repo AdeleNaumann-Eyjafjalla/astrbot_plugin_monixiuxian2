@@ -301,8 +301,17 @@ class BreakthroughManager:
                     # 返回False（突破失败），消息，False（未真正死亡）
                     return False, resurrection_msg, False
 
+                # 保存灵根供死亡后继承选择
+                saved_root = player.spiritual_root
+                
                 # 玩家死亡 - 级联删除所有关联数据
                 await self.db.delete_player_cascade(player.user_id)
+
+                # 存入系统配置，允许玩家选择继承此灵根
+                try:
+                    await self.db.ext.set_system_config(f"dead_root_{player.user_id}", saved_root)
+                except Exception:
+                    pass
 
                 death_msg = (
                     f"💀 突破失败，走火入魔！💀\n"
@@ -311,7 +320,11 @@ class BreakthroughManager:
                     f"━━━━━━━━━━━━━━━\n"
                     f"你在突破【{next_level_name}】时走火入魔，身死道消...\n"
                     f"所有修为和装备化为虚无\n"
-                    f"若想重新修仙，请使用'我要修仙'命令重新开始"
+                    f"\n"
+                    f"🔮 轮回选择：\n"
+                    f"  · 输入「我要修仙 灵修」重新随机灵根\n"
+                    f"  · 输入「我要修仙 灵修 继承」保留灵根【{saved_root}】\n"
+                    f"（"体修"同理，替换"灵修"即可）"
                 )
 
                 logger.info(

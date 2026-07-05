@@ -232,12 +232,70 @@ class ShopManager:
             return False
         return (int(time.time()) - last_refresh_time) >= (refresh_hours * 3600)
 
-    def generate_pavilion_items(self, item_getter, count: int) -> List[Dict]:
-        """生成阁楼物品列表（带库存和折扣）"""
+    def get_pills_guaranteed_breakthrough(self, count: int) -> List[Dict]:
+        """获取丹药列表，确保破境丹有专属位置（至少2个）"""
+        breakthrough_pills = []
+        other_pills = []
+
+        # 破境丹（专属池）
+        for pill in self.config_manager.pills_data.values():
+            if pill.get('price', 0) > 0 and pill.get('shop_weight', 0) > 0:
+                breakthrough_pills.append({
+                    'name': pill['name'], 'type': 'pill', 'price': pill['price'],
+                    'rank': pill.get('rank', '凡品'), 'data': pill
+                })
+
+        # 修为丹 + 功能丹（普通池）
+        for pill in self.config_manager.exp_pills_data.values():
+            if pill.get('price', 0) > 0:
+                other_pills.append({
+                    'name': pill['name'], 'type': 'exp_pill', 'price': pill['price'],
+                    'rank': pill.get('rank', '凡品'), 'data': pill
+                })
+        for pill in self.config_manager.utility_pills_data.values():
+            if pill.get('price', 0) > 0:
+                other_pills.append({
+                    'name': pill['name'], 'type': 'utility_pill', 'price': pill['price'],
+                    'rank': pill.get('rank', '凡品'), 'data': pill
+                })
+
+        # 返回所有丹药，generate_pavilion_items 会优先从破境丹池选2个
+        return breakthrough_pills + other_pills
+
+    def generate_pavilion_items(self, item_getter, count: int,
+                                 guarantee_count: int = 0, guarantee_pool: List[Dict] = None) -> List[Dict]:
+        """生成阁楼物品列表（带库存和折扣）
+        
+        Args:
+            item_getter: 获取物品的可调用对象
+            count: 物品总数
+            guarantee_count: 保底物品数量（从 guarantee_pool 中优先选择）
+            guarantee_pool: 保底物品池（需保证至少出现 guarantee_count 个）
+        """
         base_items = item_getter(count * 2)  # 获取更多以便随机选择
-        selected = self._weighted_random_choice(
-            [{'weight': i.get('data', {}).get('shop_weight', 100), **i} for i in base_items], count
-        )
+
+        selected = []
+        if guarantee_count > 0 and guarantee_pool:
+            # 从保底池中随机选 guarantee_count 个
+            # 同时从 base_items 中移除已保底的同类物品（避免重复）
+            guaranteed_names = set()
+            if len(guarantee_pool) <= guarantee_count:
+                guaranteed = guarantee_pool.copy()
+            else:
+                guaranteed = random.sample(guarantee_pool, min(guarantee_count, len(guarantee_pool)))
+            for g in guaranteed:
+                guaranteed_names.add(g['name'])
+            selected = guaranteed
+            # 从 base_items 中排除已经在保底中的同名物品
+            base_items = [i for i in base_items if i['name'] not in guaranteed_names]
+        
+        remaining_count = count - len(selected)
+        if remaining_count > 0:
+            remaining_selected = self._weighted_random_choice(
+                [{'weight': i.get('data', {}).get('shop_weight', 100), **i} for i in base_items],
+                min(remaining_count, len(base_items))
+            )
+            selected = selected + remaining_selected
         discount_min = self.config.get("SHOP_DISCOUNT_MIN", 0.8)
         discount_max = self.config.get("SHOP_DISCOUNT_MAX", 1.2)
         result = []
@@ -332,6 +390,45 @@ class ShopManager:
 
         # 其他类型保持不变
         return original_type
+
+    def get_direct_sale_pills(self) -> List[Dict]:
+        """获取破境丹直售列表（天机阁NPC兜底，原价无限供应）"""
+        pills = []
+        for pill in self.config_manager.pills_data.values():
+            if pill.get('subtype') == 'breakthrough' and pill.get('price', 0) > 0:
+                pills.append({
+                    'name': pill['name'],
+                    'type': 'pill',
+                    'price': pill['price'],
+                    'rank': pill.get('rank', '凡品'),
+                    'data': pill,
+                    'target_level_index': pill.get('target_level_index'),
+                    'breakthrough_bonus': pill.get('breakthrough_bonus', 0)
+                })
+        # 按目标境界排序
+        pills.sort(key=lambda x: x.get('target_level_index', 0))
+        return pills
+
+    def format_direct_sale_display(self, player_level_index: int) -> str:
+        """格式化天机阁直售展示"""
+        pills = self.get_direct_sale_pills()
+        lines = ["🔮 天机阁 — 破境丹直售（原价·无限量）", "━━━━━━━━━━━━━━━", "",
+                 "💡 无需等待刷新，随时购买兜底破境丹", ""]
+
+        for i, pill in enumerate(pills, 1):
+            target_level = pill.get('target_level_index', 0)
+            bonus = int(pill.get('breakthrough_bonus', 0) * 100)
+            target_name = self._format_required_level(target_level)
+            # 标记玩家当前可用的丹药
+            can_use = "⚡" if player_level_index >= target_level - 1 else "  "
+            lines.append(
+                f"{can_use} {i}. [{pill['rank']}] {pill['name']}\n"
+                f"   目标: {target_name} | 成功率+{bonus}% | 价格: {pill['price']:,} 灵石\n"
+            )
+
+        lines.append("━━━━━━━━━━━━━━━")
+        lines.append("使用 /购买 <丹药名> 从天机阁购买")
+        return "\n".join(lines)
 
     def find_item_by_name(self, name: str) -> Optional[Dict]:
         """根据名称查找物品"""

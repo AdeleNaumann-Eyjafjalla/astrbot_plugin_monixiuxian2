@@ -101,17 +101,21 @@ class BankManager:
             
             bank_data = await self.db.ext.get_bank_account(player.user_id)
             current_balance = bank_data["balance"] if bank_data else 0
+            last_interest_time = bank_data["last_interest_time"] if bank_data else 0
             
-            if current_balance + amount > self.max_deposit:
+            # 先结算待领利息（与取款一致）
+            pending_interest = self._calculate_interest(current_balance, last_interest_time)
+            
+            if current_balance + pending_interest + amount > self.max_deposit:
                 await self.db.conn.rollback()
-                return False, f"存款上限为 {self.max_deposit:,} 灵石，当前余额 {current_balance:,}。"
+                return False, f"存款上限为 {self.max_deposit:,} 灵石，当前余额（含待领利息）{current_balance + pending_interest:,}。"
             
             player.gold -= amount
             await self.db.update_player(player)
             
-            new_balance = current_balance + amount
             now = int(time.time())
-            # 存款时总是重置利息计时（利息已按复利结算到当前余额中）
+            # 新余额 = 旧余额 + 已结算利息 + 本次存款；同时重置利息计时
+            new_balance = current_balance + pending_interest + amount
             await self.db.ext.update_bank_account(
                 player.user_id, 
                 new_balance, 
@@ -119,9 +123,12 @@ class BankManager:
             )
             
             await self._add_transaction(player.user_id, "deposit", amount, new_balance, "存入灵石")
+            if pending_interest > 0:
+                await self._add_transaction(player.user_id, "interest", pending_interest, new_balance, "存款时自动结算利息")
             
             await self.db.conn.commit()
-            return True, f"成功存入 {amount:,} 灵石！\n当前余额：{new_balance:,} 灵石"
+            interest_msg = f"\n📈 已结算利息：{pending_interest:,} 灵石" if pending_interest > 0 else ""
+            return True, f"成功存入 {amount:,} 灵石！\n当前余额：{new_balance:,} 灵石{interest_msg}"
         except Exception as e:
             await self.db.conn.rollback()
             raise
@@ -353,8 +360,17 @@ class BankManager:
             
             player_name = player.user_name or f"道友{player.user_id[:6]}"
             
+            # 保存灵根供死亡后继承选择
+            saved_root = player.spiritual_root
+            
             # 删除玩家数据（银行追杀致死）- 级联删除所有关联数据
             await self.db.delete_player_cascade(player.user_id)
+            
+            # 存入系统配置，允许玩家选择继承此灵根
+            try:
+                await self.db.ext.set_system_config(f"dead_root_{player.user_id}", saved_root)
+            except Exception:
+                pass
             
             # 标记贷款逾期
             await self.db.ext.mark_loan_overdue(loan["id"])
