@@ -161,7 +161,6 @@ CMD_DUAL_CULT_REJECT = "拒绝双修"
 # Phase 4: 灵眼
 CMD_SPIRIT_EYE_INFO = "灵眼信息"
 CMD_SPIRIT_EYE_CLAIM = "抢占灵眼"
-CMD_SPIRIT_EYE_COLLECT = "灵眼收取"
 CMD_SPIRIT_EYE_RELEASE = "释放灵眼"
 
 CMD_REBIRTH = "弃道重修"
@@ -231,7 +230,7 @@ class XiuXianPlugin(Star):
         self.dual_cult_mgr = DualCultivationManager(self.db)
         self.dual_cult_handlers = DualCultivationHandlers(self.db, self.dual_cult_mgr)
         self.spirit_eye_mgr = SpiritEyeManager(self.db)
-        self.spirit_eye_handlers = SpiritEyeHandlers(self.db, self.spirit_eye_mgr)
+        self.spirit_eye_handlers = SpiritEyeHandlers(self.db, self.spirit_eye_mgr, self.combat_mgr, self.config_manager)
         
         self.boss_task = None # Boss生成任务
         self.loan_check_task = None # 贷款逾期检查任务
@@ -527,7 +526,7 @@ class XiuXianPlugin(Star):
             logger.error(f"【修仙插件】贷款追杀广播异常: {e}")
 
     async def _schedule_spirit_eye_spawn(self):
-        """灵眼生成定时任务（每2小时生成一个，支持指数退避）"""
+        """灵眼定时任务（每2小时：自动收税 + 生成新灵眼，支持指数退避）"""
         import time
         
         retry_count = 0
@@ -536,7 +535,6 @@ class XiuXianPlugin(Star):
         while True:
             try:
                 await self.db.ensure_connection()
-                # 每2小时生成一个灵眼
                 spawn_interval = 7200
                 
                 # 检查是否有存储的下次刷新时间
@@ -554,17 +552,25 @@ class XiuXianPlugin(Star):
                     await self.db.ext.set_system_config("spirit_eye_next_spawn_time", str(next_spawn_time))
                     await asyncio.sleep(spawn_interval)
                 
-                # 生成灵眼
+                # 1. 先自动结算所有灵眼持有者的收益
+                collect_logs = await self.spirit_eye_mgr.auto_collect_all()
+                if collect_logs:
+                    logger.info(f"【修仙插件】灵眼自动结算 {len(collect_logs)} 笔收益")
+                
+                # 2. 生成新灵眼
                 success, msg = await self.spirit_eye_mgr.spawn_spirit_eye()
                 if success:
+                    # 拼接结算信息（如果有）
+                    broadcast = msg
+                    if collect_logs:
+                        broadcast += f"\n灵眼收益结算({len(collect_logs)}人)"
                     logger.info(f"【修仙插件】{msg}")
-                    await self._broadcast_spirit_eye_spawn(msg)
+                    await self._broadcast_spirit_eye_spawn(broadcast)
                 
                 # 设置下次刷新时间
                 next_spawn_time = int(time.time()) + spawn_interval
                 await self.db.ext.set_system_config("spirit_eye_next_spawn_time", str(next_spawn_time))
                 
-                # 成功后重置重试计数
                 retry_count = 0
                 
             except asyncio.CancelledError:
@@ -1255,12 +1261,6 @@ class XiuXianPlugin(Star):
     @require_whitelist
     async def handle_spirit_eye_claim(self, event: AstrMessageEvent, eye_id: int = 0):
         async for r in self.spirit_eye_handlers.handle_claim(event, eye_id):
-            yield r
-
-    @filter.command(CMD_SPIRIT_EYE_COLLECT, "收取灵眼产出")
-    @require_whitelist
-    async def handle_spirit_eye_collect(self, event: AstrMessageEvent):
-        async for r in self.spirit_eye_handlers.handle_collect(event):
             yield r
 
     @filter.command(CMD_SPIRIT_EYE_RELEASE, "释放灵眼")
