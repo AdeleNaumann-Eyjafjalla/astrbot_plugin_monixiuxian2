@@ -43,6 +43,7 @@ CMD_CHECK_IN = "签到"
 CMD_SHOW_EQUIPMENT = "我的装备"
 CMD_EQUIP_ITEM = "装备"
 CMD_UNEQUIP_ITEM = "卸下"
+CMD_ENHANCE = "强化"
 CMD_BREAKTHROUGH = "突破"
 CMD_BREAKTHROUGH_INFO = "突破信息"
 CMD_USE_PILL = "服用丹药"
@@ -673,6 +674,12 @@ class XiuXianPlugin(Star):
         async for r in self.equipment_handler.handle_unequip_item(event, slot_or_name):
             yield r
 
+    @filter.command(CMD_ENHANCE, "强化装备（消耗强化石，提升装备属性）")
+    @require_whitelist
+    async def handle_enhance(self, event: AstrMessageEvent, slot: str = ""):
+        async for r in self.equipment_handler.handle_enhance(event, slot):
+            yield r
+
     @filter.command(CMD_BREAKTHROUGH_INFO, "查看突破信息")
     @require_whitelist
     async def handle_breakthrough_info(self, event: AstrMessageEvent):
@@ -721,7 +728,7 @@ class XiuXianPlugin(Star):
         async for r in self.shop_handler.handle_treasure_pavilion(event):
             yield r
 
-    @filter.command(CMD_TIANJI_PAVILION, "天机阁破境丹直售(原价无限量)")
+    @filter.command(CMD_TIANJI_PAVILION, "天机阁强化材料直售(原价无限量)")
     @require_whitelist
     async def handle_tianji_pavilion(self, event: AstrMessageEvent):
         async for r in self.shop_handler.handle_tianji_pavilion(event):

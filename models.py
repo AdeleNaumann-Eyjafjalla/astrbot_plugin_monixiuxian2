@@ -33,25 +33,49 @@ class Item:
     spiritual_qi: int = 0  # 灵气加成（仅心法有效，灵修）
     blood_qi: int = 0  # 气血加成（仅心法有效，体修）
 
+    # 强化
+    enhance_level: int = 0  # 强化等级（0-12，每级+10%全属性）
+
+    def get_enhanced_attr(self, base_value: int) -> int:
+        """获取强化后的属性值"""
+        return int(base_value * (1 + self.enhance_level * 0.10))
+
     def get_attribute_display(self) -> str:
-        """获取属性加成的显示文本"""
+        """获取属性加成的显示文本（含强化加成）"""
+        enhance_mult = 1 + self.enhance_level * 0.10
         attrs = []
         if self.magic_damage > 0:
-            attrs.append(f"法伤+{self.magic_damage}")
+            val = int(self.magic_damage * enhance_mult)
+            tag = f"(+{self.enhance_level})" if self.enhance_level > 0 else ""
+            attrs.append(f"法伤+{val}{tag}")
         if self.physical_damage > 0:
-            attrs.append(f"物伤+{self.physical_damage}")
+            val = int(self.physical_damage * enhance_mult)
+            tag = f"(+{self.enhance_level})" if self.enhance_level > 0 else ""
+            attrs.append(f"物伤+{val}{tag}")
         if self.magic_defense > 0:
-            attrs.append(f"法防+{self.magic_defense}")
+            val = int(self.magic_defense * enhance_mult)
+            tag = f"(+{self.enhance_level})" if self.enhance_level > 0 else ""
+            attrs.append(f"法防+{val}{tag}")
         if self.physical_defense > 0:
-            attrs.append(f"物防+{self.physical_defense}")
+            val = int(self.physical_defense * enhance_mult)
+            tag = f"(+{self.enhance_level})" if self.enhance_level > 0 else ""
+            attrs.append(f"物防+{val}{tag}")
         if self.mental_power > 0:
-            attrs.append(f"精神力+{self.mental_power}")
+            val = int(self.mental_power * enhance_mult)
+            tag = f"(+{self.enhance_level})" if self.enhance_level > 0 else ""
+            attrs.append(f"精神力+{val}{tag}")
         if self.exp_multiplier > 0:
-            attrs.append(f"修为倍率+{self.exp_multiplier:.1%}")
+            val = self.exp_multiplier * enhance_mult
+            tag = f"(+{self.enhance_level})" if self.enhance_level > 0 else ""
+            attrs.append(f"修为倍率+{val:.1%}{tag}")
         if self.spiritual_qi > 0:
-            attrs.append(f"灵气+{self.spiritual_qi}")
+            val = int(self.spiritual_qi * enhance_mult)
+            tag = f"(+{self.enhance_level})" if self.enhance_level > 0 else ""
+            attrs.append(f"灵气+{val}{tag}")
         if self.blood_qi > 0:
-            attrs.append(f"气血+{self.blood_qi}")
+            val = int(self.blood_qi * enhance_mult)
+            tag = f"(+{self.enhance_level})" if self.enhance_level > 0 else ""
+            attrs.append(f"气血+{val}{tag}")
         return "、".join(attrs) if attrs else "无属性加成"
 
 @dataclass
@@ -121,6 +145,9 @@ class Player:
     # Phase 1: 每日限制系统
     daily_pill_usage: str = "{}"  # 每日丹药使用次数（JSON字符串，格式：{pill_id: count}）
     last_daily_reset: str = ""  # 上次每日重置日期（格式：YYYY-MM-DD）
+
+    # Phase 2: 装备强化系统
+    equipment_enhance: str = "{}"  # 装备强化等级（JSON字符串，格式：{item_name: enhance_level}）
 
     def get_level(self, config_manager: "ConfigManager") -> str:
         """获取境界名称"""
@@ -215,19 +242,19 @@ class Player:
             "exp_multiplier": 0.0,  # 基础修为倍率为0，只来自心法
         }
 
-        # 叠加装备属性
+        # 叠加装备属性（含强化加成）
         for item in equipped_items:
-            total["magic_damage"] += item.magic_damage
-            total["physical_damage"] += item.physical_damage
-            total["magic_defense"] += item.magic_defense
-            total["physical_defense"] += item.physical_defense
-            total["mental_power"] += item.mental_power
+            total["magic_damage"] += item.get_enhanced_attr(item.magic_damage)
+            total["physical_damage"] += item.get_enhanced_attr(item.physical_damage)
+            total["magic_defense"] += item.get_enhanced_attr(item.magic_defense)
+            total["physical_defense"] += item.get_enhanced_attr(item.physical_defense)
+            total["mental_power"] += item.get_enhanced_attr(item.mental_power)
 
             # 心法专属属性
             if item.item_type == "main_technique":
-                total["exp_multiplier"] += item.exp_multiplier
-                total["max_spiritual_qi"] += item.spiritual_qi
-                total["max_blood_qi"] += item.blood_qi
+                total["exp_multiplier"] += item.exp_multiplier * (1 + item.enhance_level * 0.10)
+                total["max_spiritual_qi"] += item.get_enhanced_attr(item.spiritual_qi)
+                total["max_blood_qi"] += item.get_enhanced_attr(item.blood_qi)
 
         # 应用丹药倍率效果
         if pill_multipliers:
@@ -237,3 +264,19 @@ class Player:
             total["magic_defense"] = int(total["magic_defense"] * pill_multipliers.get("magic_defense", 1.0))
 
         return total
+
+    def get_equipment_enhance(self) -> dict:
+        """获取装备强化等级字典"""
+        try:
+            return json.loads(self.equipment_enhance)
+        except json.JSONDecodeError:
+            return {}
+
+    def set_equipment_enhance(self, data: dict):
+        """设置装备强化等级字典"""
+        self.equipment_enhance = json.dumps(data, ensure_ascii=False)
+
+    def get_item_enhance_level(self, item_name: str) -> int:
+        """获取某装备的强化等级"""
+        data = self.get_equipment_enhance()
+        return data.get(item_name, 0)

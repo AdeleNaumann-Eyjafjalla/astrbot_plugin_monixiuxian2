@@ -10,6 +10,7 @@ from .utils import player_required
 CMD_SHOW_EQUIPMENT = "我的装备"
 CMD_EQUIP_ITEM = "装备"
 CMD_UNEQUIP_ITEM = "卸下"
+CMD_ENHANCE = "强化"
 
 __all__ = ["EquipmentHandler"]
 
@@ -218,3 +219,23 @@ class EquipmentHandler:
             yield event.plain_result(f"✅ {message}{storage_msg}")
         else:
             yield event.plain_result(f"❌ {message}")
+
+    @player_required
+    async def handle_enhance(self, player: Player, event: AstrMessageEvent, slot: str = ""):
+        """强化装备"""
+        if not slot or slot.strip() == "":
+            yield event.plain_result(
+                "请指定要强化的装备槽位\n"
+                "用法：强化 武器/防具/心法\n"
+                "示例：强化 武器"
+            )
+            return
+
+        slot = slot.strip()
+        success, msg = await self.equipment_manager.enhance_equipment(
+            player, slot, 
+            self.config_manager.items_data,
+            self.config_manager.weapons_data
+        )
+        prefix = "✅" if success else "❌"
+        yield event.plain_result(f"{prefix} {msg}")

@@ -751,5 +751,45 @@
         "description": "魔道无上功法，吞噬万物本源，禁忌的存在。",
         "price": 6666666,
         "shop_weight": 20
+    },
+    "5001": {
+        "name": "初级强化石",
+        "type": "材料",
+        "subtype": "enhance",
+        "rank": "凡品",
+        "description": "蕴含微弱灵气的矿石，可强化+0~+3的装备，每次强化全属性+10%。",
+        "price": 1000,
+        "enhance_tier": 1,
+        "shop_weight": 0
+    },
+    "5002": {
+        "name": "中级强化石",
+        "type": "材料",
+        "subtype": "enhance",
+        "rank": "珍品",
+        "description": "蕴含精纯灵气的矿石，可强化+3~+6的装备，每次强化全属性+10%。",
+        "price": 5000,
+        "enhance_tier": 2,
+        "shop_weight": 0
+    },
+    "5003": {
+        "name": "高级强化石",
+        "type": "材料",
+        "subtype": "enhance",
+        "rank": "圣品",
+        "description": "蕴含磅礴灵气的稀有矿石，可强化+6~+9的装备，每次强化全属性+10%。",
+        "price": 20000,
+        "enhance_tier": 3,
+        "shop_weight": 0
+    },
+    "5004": {
+        "name": "极品强化石",
+        "type": "材料",
+        "subtype": "enhance",
+        "rank": "帝品",
+        "description": "蕴含天地法则的顶级矿石，可强化+9~+12的装备，每次强化全属性+10%。",
+        "price": 100000,
+        "enhance_tier": 4,
+        "shop_weight": 0
     }
 }

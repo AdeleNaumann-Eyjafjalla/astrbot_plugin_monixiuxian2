@@ -16,7 +16,7 @@ class ShopHandler:
     """商店处理器"""
     
     ITEM_ACQUIRE_HINTS = {
-        'pill': "丹阁(保底2位)、天机阁直售、宗门丹房兑换、炼丹、Boss掉落、百宝阁",
+        'pill': "丹阁(保底2位)、宗门丹房兑换、炼丹、Boss掉落、百宝阁",
         'exp_pill': "丹阁、炼丹系统、历练/秘境奖励",
         'utility_pill': "丹阁稀有、秘境/Boss 掉落",
         'legacy_pill': "百宝阁限量，购买后立即生效",
@@ -25,7 +25,7 @@ class ShopHandler:
         'accessory': "器阁、Boss 掉落",
         'main_technique': "百宝阁稀有刷新",
         'technique': "百宝阁、Boss 掉落",
-        'material': "历练、秘境、悬赏、灵田收获与百宝阁限量",
+        'material': "天机阁直售(强化石)、历练、秘境、悬赏、灵田收获与百宝阁限量",
     }
 
     def __init__(self, db: DataBase, config: AstrBotConfig, config_manager: ConfigManager):
@@ -102,7 +102,7 @@ class ShopHandler:
 
     @player_required
     async def handle_tianji_pavilion(self, player: Player, event: AstrMessageEvent):
-        """处理天机阁命令 - 破境丹NPC直售兜底"""
+        """处理天机阁命令 - 强化材料NPC直售兜底"""
         display = self.shop_manager.format_direct_sale_display(player.level_index)
         yield event.plain_result(display)
 
@@ -114,11 +114,10 @@ class ShopHandler:
                 for item in items:
                     if item['name'] == item_name and item.get('stock', 0) > 0:
                         return pavilion_id, item
-        # 天机阁兜底：查找破境丹直售
-        dsp = self.shop_manager.get_direct_sale_pills()
-        for item in dsp:
+        # 天机阁兜底：查找强化材料直售
+        dsm = self.shop_manager.get_direct_sale_materials()
+        for item in dsm:
             if item['name'] == item_name:
-                # 天机阁无限库存
                 tianji_item = item.copy()
                 tianji_item['stock'] = 999
                 tianji_item['discount'] = 1.0

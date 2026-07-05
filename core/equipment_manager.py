@@ -11,12 +11,30 @@ if TYPE_CHECKING:
 class EquipmentManager:
     """装备管理器 - 处理装备的穿戴、卸下和属性计算"""
 
+    # 强化等级与所需强化石映射
+    ENHANCE_TIERS = {
+        0: {"stone": "初级强化石", "max": 3, "success_rate": 1.0},
+        1: {"stone": "初级强化石", "max": 3, "success_rate": 1.0},
+        2: {"stone": "初级强化石", "max": 3, "success_rate": 1.0},
+        3: {"stone": "中级强化石", "max": 6, "success_rate": 0.70},
+        4: {"stone": "中级强化石", "max": 6, "success_rate": 0.70},
+        5: {"stone": "中级强化石", "max": 6, "success_rate": 0.70},
+        6: {"stone": "高级强化石", "max": 9, "success_rate": 0.50},
+        7: {"stone": "高级强化石", "max": 9, "success_rate": 0.50},
+        8: {"stone": "高级强化石", "max": 9, "success_rate": 0.50},
+        9: {"stone": "极品强化石", "max": 12, "success_rate": 0.30},
+        10: {"stone": "极品强化石", "max": 12, "success_rate": 0.30},
+        11: {"stone": "极品强化石", "max": 12, "success_rate": 0.30},
+    }
+    MAX_ENHANCE = 12
+    ENHANCE_PER_LEVEL = 0.10  # 每级强化 +10% 全属性
+
     def __init__(self, db: DataBase, config_manager: "ConfigManager" = None, storage_ring_manager: "StorageRingManager" = None):
         self.db = db
         self.config_manager = config_manager
         self.storage_ring_manager = storage_ring_manager
 
-    def parse_item_from_name(self, item_name: str, items_data: dict, weapons_data: dict = None) -> Optional[Item]:
+    def parse_item_from_name(self, item_name: str, items_data: dict, weapons_data: dict = None, enhance_level: int = 0) -> Optional[Item]:
         """从物品名称解析为Item对象
 
         Args:
@@ -90,11 +108,12 @@ class EquipmentManager:
             mental_power=mental_power,
             exp_multiplier=item_config.get("exp_multiplier", 0.0),
             spiritual_qi=item_config.get("spiritual_qi", 0),
-            blood_qi=item_config.get("blood_qi", 0)
+            blood_qi=item_config.get("blood_qi", 0),
+            enhance_level=enhance_level
         )
 
     def get_equipped_items(self, player: Player, items_data: dict, weapons_data: dict = None) -> List[Item]:
-        """获取玩家所有已装备的物品
+        """获取玩家所有已装备的物品（含强化等级）
 
         Args:
             player: 玩家对象
@@ -105,29 +124,34 @@ class EquipmentManager:
             已装备物品列表
         """
         equipped = []
+        enhance_data = player.get_equipment_enhance()
 
         # 武器
         if player.weapon:
-            item = self.parse_item_from_name(player.weapon, items_data, weapons_data)
+            lv = enhance_data.get(player.weapon, 0)
+            item = self.parse_item_from_name(player.weapon, items_data, weapons_data, enhance_level=lv)
             if item:
                 equipped.append(item)
 
         # 防具
         if player.armor:
-            item = self.parse_item_from_name(player.armor, items_data, weapons_data)
+            lv = enhance_data.get(player.armor, 0)
+            item = self.parse_item_from_name(player.armor, items_data, weapons_data, enhance_level=lv)
             if item:
                 equipped.append(item)
 
         # 主修心法
         if player.main_technique:
-            item = self.parse_item_from_name(player.main_technique, items_data, weapons_data)
+            lv = enhance_data.get(player.main_technique, 0)
+            item = self.parse_item_from_name(player.main_technique, items_data, weapons_data, enhance_level=lv)
             if item:
                 equipped.append(item)
 
         # 功法列表
         techniques_list = player.get_techniques_list()
         for technique_name in techniques_list:
-            item = self.parse_item_from_name(technique_name, items_data, weapons_data)
+            lv = enhance_data.get(technique_name, 0)
+            item = self.parse_item_from_name(technique_name, items_data, weapons_data, enhance_level=lv)
             if item:
                 equipped.append(item)
 
@@ -292,6 +316,89 @@ class EquipmentManager:
             return True, f"已卸下功法【{slot_or_name}】"
 
         return False, f"未找到装备：{slot_or_name}"
+
+    async def enhance_equipment(self, player: Player, slot: str,
+                                 items_data: dict, weapons_data: dict = None) -> tuple:
+        """强化已装备的装备"""
+        import random
+
+        if slot in ["武器", "weapon"]:
+            item_name = player.weapon
+            slot_display = "武器"
+        elif slot in ["防具", "armor"]:
+            item_name = player.armor
+            slot_display = "防具"
+        elif slot in ["主修心法", "心法", "main_technique"]:
+            item_name = player.main_technique
+            slot_display = "主修心法"
+        else:
+            return False, f"无效的强化槽位：{slot}（支持：武器/防具/心法）"
+
+        if not item_name:
+            return False, f"你没有装备{slot_display}，无法强化。"
+
+        enhance_data = player.get_equipment_enhance()
+        current_level = enhance_data.get(item_name, 0)
+
+        if current_level >= self.MAX_ENHANCE:
+            return False, f"【{item_name}】已达最高强化等级 +{self.MAX_ENHANCE}！"
+
+        tier_info = self.ENHANCE_TIERS.get(current_level)
+        if not tier_info:
+            return False, "强化系统配置错误。"
+
+        stone_name = tier_info["stone"]
+        success_rate = tier_info["success_rate"]
+
+        if not self.storage_ring_manager:
+            return False, "储物戒系统未初始化。"
+
+        if not self.storage_ring_manager.has_item(player, stone_name, 1):
+            return False, (
+                f"❌ 储物戒中没有【{stone_name}】！\n"
+                f"━━━━━━━━━━━━━━━\n"
+                f"当前强化：+{current_level} → 目标：+{current_level + 1}\n"
+                f"所需：{stone_name} ×1 | 成功率：{success_rate:.0%}\n"
+                f"━━━━━━━━━━━━━━━\n"
+                f"💡 前往天机阁购买强化石"
+            )
+
+        success, _ = await self.storage_ring_manager.retrieve_item(player, stone_name, 1)
+        if not success:
+            return False, "取出强化石失败。"
+
+        roll = random.random()
+        if roll <= success_rate:
+            enhance_data[item_name] = current_level + 1
+            player.set_equipment_enhance(enhance_data)
+            await self.db.update_player(player)
+
+            item = self.parse_item_from_name(item_name, items_data, weapons_data, enhance_level=current_level + 1)
+            attr_display = item.get_attribute_display() if item else "未知"
+
+            return True, (
+                f"✨ 强化成功！\n"
+                f"━━━━━━━━━━━━━━━\n"
+                f"{slot_display}【{item_name}】+{current_level} → +{current_level + 1}\n"
+                f"当前属性：{attr_display}\n"
+                f"━━━━━━━━━━━━━━━\n"
+                f"消耗：{stone_name} ×1"
+            )
+        else:
+            await self.db.update_player(player)
+
+            item = self.parse_item_from_name(item_name, items_data, weapons_data, enhance_level=current_level)
+            attr_display = item.get_attribute_display() if item else "未知"
+
+            return True, (
+                f"💔 强化失败！\n"
+                f"━━━━━━━━━━━━━━━\n"
+                f"{slot_display}【{item_name}】仍为 +{current_level}\n"
+                f"当前属性：{attr_display}\n"
+                f"━━━━━━━━━━━━━━━\n"
+                f"消耗：{stone_name} ×1\n"
+                f"💡 再接再厉，下次一定能成功！"
+            )
 
     async def _store_old_equipment(self, player: Player, item_name: str) -> str:
         """尝试将旧装备存入储物戒

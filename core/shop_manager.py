@@ -392,42 +392,51 @@ class ShopManager:
         return original_type
 
     def get_direct_sale_pills(self) -> List[Dict]:
-        """获取破境丹直售列表（天机阁NPC兜底，原价无限供应）"""
-        pills = []
-        for pill in self.config_manager.pills_data.values():
-            if pill.get('subtype') == 'breakthrough' and pill.get('price', 0) > 0:
-                pills.append({
-                    'name': pill['name'],
-                    'type': 'pill',
-                    'price': pill['price'],
-                    'rank': pill.get('rank', '凡品'),
-                    'data': pill,
-                    'target_level_index': pill.get('target_level_index'),
-                    'breakthrough_bonus': pill.get('breakthrough_bonus', 0)
+        """获取破境丹直售列表（已废弃，保留兼容）"""
+        return []
+
+    def get_direct_sale_materials(self) -> List[Dict]:
+        """获取强化材料直售列表（天机阁NPC，原价无限供应）"""
+        materials = []
+        for item in self.config_manager.items_data.values():
+            if item.get('subtype') == 'enhance' and item.get('price', 0) > 0:
+                materials.append({
+                    'name': item['name'],
+                    'type': 'material',
+                    'price': item['price'],
+                    'rank': item.get('rank', '凡品'),
+                    'data': item,
+                    'enhance_tier': item.get('enhance_tier', 0),
+                    'description': item.get('description', '')
                 })
-        # 按目标境界排序
-        pills.sort(key=lambda x: x.get('target_level_index', 0))
-        return pills
+        materials.sort(key=lambda x: x.get('enhance_tier', 0))
+        return materials
 
     def format_direct_sale_display(self, player_level_index: int) -> str:
-        """格式化天机阁直售展示"""
-        pills = self.get_direct_sale_pills()
-        lines = ["🔮 天机阁 — 破境丹直售（原价·无限量）", "━━━━━━━━━━━━━━━", "",
-                 "💡 无需等待刷新，随时购买兜底破境丹", ""]
+        """格式化天机阁直售展示（强化材料）"""
+        materials = self.get_direct_sale_materials()
+        lines = ["🔮 天机阁 — 强化材料直售（原价·无限量）", "━━━━━━━━━━━━━━━", "",
+                 "💡 无需等待刷新，随时购买强化石强化装备", "",
+                 "📊 强化规则：", 
+                 "  · 每级+10%全属性，最高+12",
+                 "  · +0~+3: 初级强化石 (100%成功)",
+                 "  · +3~+6: 中级强化石 (70%成功)",
+                 "  · +6~+9: 高级强化石 (50%成功)",
+                 "  · +9~+12: 极品强化石 (30%成功)",
+                 "  · 失败不掉级，仅消耗强化石",
+                 ""]
 
-        for i, pill in enumerate(pills, 1):
-            target_level = pill.get('target_level_index', 0)
-            bonus = int(pill.get('breakthrough_bonus', 0) * 100)
-            target_name = self._format_required_level(target_level)
-            # 标记玩家当前可用的丹药
-            can_use = "⚡" if player_level_index >= target_level - 1 else "  "
+        for i, mat in enumerate(materials, 1):
+            tier = mat.get('enhance_tier', 0)
+            tier_names = {1: "适用+0~+3", 2: "适用+3~+6", 3: "适用+6~+9", 4: "适用+9~+12"}
+            tier_desc = tier_names.get(tier, "")
             lines.append(
-                f"{can_use} {i}. [{pill['rank']}] {pill['name']}\n"
-                f"   目标: {target_name} | 成功率+{bonus}% | 价格: {pill['price']:,} 灵石\n"
+                f"  {i}. [{mat['rank']}] {mat['name']}\n"
+                f"     {tier_desc} | 价格: {mat['price']:,} 灵石\n"
             )
 
         lines.append("━━━━━━━━━━━━━━━")
-        lines.append("使用 /购买 <丹药名> 从天机阁购买")
+        lines.append("使用 /购买 <强化石名> 从天机阁购买")
         return "\n".join(lines)
 
     def find_item_by_name(self, name: str) -> Optional[Dict]:

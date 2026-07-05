@@ -7,7 +7,7 @@ from typing import Dict, Callable, Awaitable
 from astrbot.api import logger
 from ..config_manager import ConfigManager
 
-LATEST_DB_VERSION = 20  # v20: 用户CD表添加额外数据字段
+LATEST_DB_VERSION = 21  # v21: 添加装备强化等级字段
 
 MIGRATION_TASKS: Dict[int, Callable[[aiosqlite.Connection, ConfigManager], Awaitable[None]]] = {}
 
@@ -1009,3 +1009,21 @@ async def _migrate_to_v20(conn: aiosqlite.Connection, config_manager: ConfigMana
     
     await conn.commit()
     logger.info("v20迁移完成：用户CD表添加额外数据字段")
+
+@migration(21)
+async def _migrate_to_v21(conn: aiosqlite.Connection, config_manager: ConfigManager):
+    """迁移到v21 - 玩家表添加装备强化等级字段"""
+    logger.info("开始迁移到v21：添加装备强化等级字段")
+    
+    # 检查列是否已存在
+    async with conn.execute("PRAGMA table_info(players)") as cursor:
+        columns = [row[1] for row in await cursor.fetchall()]
+    
+    if "equipment_enhance" not in columns:
+        await conn.execute("ALTER TABLE players ADD COLUMN equipment_enhance TEXT NOT NULL DEFAULT '{}'")
+        logger.info("已添加 equipment_enhance 列")
+    else:
+        logger.info("equipment_enhance 列已存在，跳过")
+    
+    await conn.commit()
+    logger.info("v21迁移完成：添加装备强化等级字段")
