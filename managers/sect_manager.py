@@ -475,9 +475,119 @@ class SectManager:
         
         return True, f"✨ 已将 {target_name} 踢出宗门！"
 
+    # 宗门任务文案（按境界档位分组）
+    SECT_MISSION_TEXTS = {
+        # 入门级：炼气期 (Lv.0-9)
+        1: [
+            "在宗门后山巡逻，驱赶闯入的低阶妖兽",
+            "为药园除草浇水，悉心照料灵草灵植",
+            "打扫宗门大殿，清理各处积尘与蛛网",
+            "前往附近坊市采买宗门日常物资",
+            "整理藏经阁一楼的基础功法典籍",
+            "帮执事长老誊抄宗门日志与花名册",
+        ],
+        # 初级：筑基-金丹 (Lv.10-15)
+        2: [
+            "前往黑风山清剿作乱的筑基期妖兽",
+            "护送宗门物资车队安全抵达邻城",
+            "协助长老炼制一炉低阶培元丹",
+            "在灵脉矿洞监督杂役开采灵石矿",
+            "为新入门弟子讲授基础吐纳功法",
+            "巡查宗门方圆百里的结界阵眼",
+        ],
+        # 中级：元婴-化神 (Lv.16-21)
+        3: [
+            "深入幽冥深渊调查近日的灵气异动",
+            "参与宗门护山大阵的维护与阵眼加固",
+            "炼制中品凝神丹补充宗门丹房库存",
+            "前往妖兽森林猎取珍稀兽核与灵材",
+            "代表宗门出席坊市拍卖会竞价宝物",
+            "在灵兽园驯养新捕获的四阶灵兽",
+        ],
+        # 高级：炼虚-合体 (Lv.22-27)
+        4: [
+            "剿灭盘踞在宗门领地边缘的强大妖兽",
+            "深入上古秘境探索未知区域并绘制地图",
+            "主持宗门外围九天玄元大阵的修复",
+            "炼制高阶破境符箓以充实宗门武库",
+            "追查魔道修士在宗门辖区内活动的踪迹",
+            "前往灵脉深处引导地脉灵气增强宗门",
+        ],
+        # 顶级：大乘及以上 (Lv.28-35)
+        5: [
+            "深入上古遗迹夺取失传的传承秘法",
+            "炼制帝品丹药为宗门太上长老续命",
+            "镇压封印松动、即将苏醒的上古凶兽",
+            "前往域外战场收集稀世天材地宝",
+            "为即将渡劫的宗门强者护法守关",
+            "以神念覆盖万里疆域清除潜伏魔物",
+        ],
+    }
+
+    # 宗门任务失败文案（按档位分组）
+    SECT_MISSION_FAIL_TEXTS = {
+        1: [
+            "在山中迷了路，只找到几株普通草药便悻悻而归",
+            "低阶妖兽早已被其他师兄弟清理干净，白跑一趟",
+            "除草时不小心踩坏了长老心爱的灵植，被训斥一番",
+            "坊市今日休市，只换得些许杂物",
+            "典籍分类时搞混了卷轴顺序，被罚重新整理",
+        ],
+        2: [
+            "黑风山的妖兽比预想中凶悍，负伤退回宗门休整",
+            "运送途中遭遇山贼伏击，虽击退但物资有所损失",
+            "炼丹炉意外炸炉，材料尽毁，只保住些残渣",
+            "矿洞塌方，不得不中断看守提前返回",
+            "讲授功法时一时语塞，弟子们听得云里雾里",
+        ],
+        3: [
+            "幽冥深渊深处魔气浓郁，修为不足以深入调查",
+            "大阵阵眼年久失修，反复尝试仍未能完全修复",
+            "炼丹时心绪不宁，一炉凝神丹炼成了废渣",
+            "妖兽森林深处遭遇意外兽潮，仓皇撤回宗门",
+            "拍卖会上竞拍失败，只能空手而回",
+        ],
+        4: [
+            "妖兽实力远超情报所述，苦战一番仍未能将其剿灭",
+            "上古秘境机关重重，在第三层触发了禁制险些丧命",
+            "修复大阵时阵眼反噬，被震伤经脉只得中途放弃",
+            "炼制符箓时灵力失控，一整叠符纸全部自燃",
+            "魔修老奸巨猾设下重重陷阱，追踪线索全断",
+        ],
+        5: [
+            "上古遗迹外围的禁制超乎想象，连续数日未能破解",
+            "帝品丹药所需天材地宝欠缺一味，功败垂成",
+            "上古凶兽残魂爆发，封印反被震裂，只得加固外层",
+            "域外战场上遭遇空间乱流，差点迷失在虚空之中",
+            "天劫提前降临，护法被余威波及，渡劫者亦未成功",
+        ],
+    }
+
+    # 宗门任务奖励配置：(最小贡献, 最大贡献, 资材倍率, 境界要求下限, 档位名称, 成功率)
+    SECT_MISSION_TIERS = [
+        (10,   30,   10,  0,  "入门",      0.95),
+        (30,   80,   10,  10, "筑基-金丹", 0.88),
+        (80,   250,  10,  16, "元婴-化神", 0.78),
+        (250,  600,  10,  22, "炼虚-合体", 0.68),
+        (600,  1500, 10,  28, "大乘之上", 0.55),
+    ]
+
+    @staticmethod
+    def _get_mission_tier(level_index: int) -> dict:
+        """根据境界获取任务档位信息"""
+        tier_idx = 0
+        for i, (mn, mx, sm, lv_req, name, sr) in enumerate(SectManager.SECT_MISSION_TIERS):
+            if level_index >= lv_req:
+                tier_idx = i
+            else:
+                break
+        mn, mx, sm, lv_req, name, sr = SectManager.SECT_MISSION_TIERS[tier_idx]
+        tier_id = tier_idx + 1  # 1-based for mission text lookup
+        return {"tier_id": tier_id, "name": name, "min_contrib": mn, "max_contrib": mx, "stone_mult": sm, "success_rate": sr}
+
     async def perform_sect_task(self, user_id: str) -> Tuple[bool, str]:
         """
-        执行宗门任务
+        执行宗门任务（根据境界分档，随机文案）
         
         Args:
             user_id: 用户ID
@@ -489,7 +599,7 @@ class SectManager:
         if not player or player.sect_id == 0:
             return False, "❌ 你还未加入宗门！"
             
-        # 检查CD：宗门任务是瞬时的，冷却时间存在 extra_data 而非设为忙碌状态
+        # 检查CD
         user_cd = await self.db.ext.get_user_cd(user_id)
         if not user_cd:
             await self.db.ext.create_user_cd(user_id)
@@ -497,7 +607,6 @@ class SectManager:
             
         current_time = int(time.time())
         
-        # 从 extra_data 读取上一次任务冷却时间
         try:
             extra = json.loads(user_cd.extra_data) if user_cd.extra_data else {}
         except (json.JSONDecodeError, TypeError):
@@ -507,38 +616,113 @@ class SectManager:
             remaining = sect_task_cd - current_time
             return False, f"❌ 宗门任务冷却中！还需 {remaining//60} 分钟。"
 
-        # 执行任务
-        contribution_gain = random.randint(10, 30)
-        stone_gain = contribution_gain * 10
+        # 根据境界获取任务档位
+        tier = self._get_mission_tier(player.level_index)
+        mission_text = random.choice(self.SECT_MISSION_TEXTS.get(tier["tier_id"], self.SECT_MISSION_TEXTS[1]))
+        
+        # 获取境界名称
+        realm_name = player.get_level(self.config_manager) if hasattr(self, 'config_manager') else f"Lv.{player.level_index}"
+        
+        # 判定成功/失败
+        success_roll = random.random()
+        success = success_roll < tier["success_rate"]
+        
+        if success:
+            # 计算奖励（5%概率暴击2倍）
+            contribution_gain = random.randint(tier["min_contrib"], tier["max_contrib"])
+            crit = random.random() < 0.05
+            if crit:
+                contribution_gain *= 2
+            stone_gain = contribution_gain * tier["stone_mult"]
+        else:
+            # 失败：获得 1/4 基础贡献（保底安慰）
+            base = random.randint(tier["min_contrib"], tier["max_contrib"])
+            contribution_gain = max(1, base // 4)
+            stone_gain = contribution_gain * tier["stone_mult"]
+            crit = False
+            fail_text = random.choice(self.SECT_MISSION_FAIL_TEXTS.get(tier["tier_id"], self.SECT_MISSION_FAIL_TEXTS[1]))
         
         player.sect_contribution += contribution_gain
-        # 增加每日任务完成次数
         player.sect_task += 1
         await self.db.update_player(player)
         
-        # 手动更新宗门资源
+        # 更新宗门资源
         sect = await self.db.ext.get_sect_by_id(player.sect_id)
         if sect:
             sect.sect_materials += stone_gain
             await self.db.ext.update_sect(sect)
 
-        # 记录1小时任务冷却到 extra_data，不改变 busy 状态
+        # 记录1小时冷却
         extra["sect_task_cd"] = current_time + 3600
         user_cd.extra_data = json.dumps(extra, ensure_ascii=False)
         await self.db.ext.update_user_cd(user_cd)
         
-        return True, f"✨ 完成宗门任务！\n获得贡献：{contribution_gain}\n宗门资材：+{stone_gain}\n今日任务次数：{player.sect_task}"
+        # 构建返回消息
+        if success:
+            msg = (
+                f"📋 宗门任务【{tier['name']}】\n"
+                f"━━━━━━━━━━━━━━━\n"
+                f"任务：{mission_text}\n"
+                f"境界：{realm_name}\n"
+            )
+            if crit:
+                msg += f"🎉 暴击！贡献翻倍！\n"
+            msg += (
+                f"结果：✅ 成功\n"
+                f"个人贡献：+{contribution_gain}\n"
+                f"宗门资材：+{stone_gain}\n"
+                f"今日任务：{player.sect_task} 次"
+            )
+        else:
+            msg = (
+                f"📋 宗门任务【{tier['name']}】\n"
+                f"━━━━━━━━━━━━━━━\n"
+                f"任务：{mission_text}\n"
+                f"境界：{realm_name}\n"
+                f"结果：❌ 失败 ({fail_text})\n"
+                f"个人贡献：+{contribution_gain}（保底）\n"
+                f"宗门资材：+{stone_gain}\n"
+                f"今日任务：{player.sect_task} 次"
+            )
+        return True, msg
 
     # 宗门贡献可兑换的破境丹列表（贡献值 = 商店原价 / 10）
     SECT_EXCHANGE_PILLS = [
-        {"name": "筑基丹", "target_level": 10, "cost": 500},
-        {"name": "结丹丹", "target_level": 13, "cost": 1500},
-        {"name": "凝婴丹", "target_level": 16, "cost": 5000},
-        {"name": "化神丹", "target_level": 19, "cost": 20000},
-        {"name": "炼虚丹", "target_level": 22, "cost": 80000},
-        {"name": "合体丹", "target_level": 25, "cost": 300000},
-        {"name": "大乘丹", "target_level": 28, "cost": 1000000},
-        {"name": "渡劫丹", "target_level": 31, "cost": 5000000},
+        # 筑基期
+        {"name": "筑基丹",    "target_level": 10, "cost": 500},
+        {"name": "固基丹·中",  "target_level": 11, "cost": 800},
+        {"name": "固基丹·后",  "target_level": 12, "cost": 1200},
+        # 金丹期
+        {"name": "结丹丹",    "target_level": 13, "cost": 1500},
+        {"name": "温丹丹·中",  "target_level": 14, "cost": 2500},
+        {"name": "温丹丹·后",  "target_level": 15, "cost": 4000},
+        # 元婴期
+        {"name": "凝婴丹",    "target_level": 16, "cost": 5000},
+        {"name": "养婴丹·中",  "target_level": 17, "cost": 8000},
+        {"name": "养婴丹·后",  "target_level": 18, "cost": 15000},
+        # 化神期
+        {"name": "化神丹",    "target_level": 19, "cost": 20000},
+        {"name": "温神丹·中",  "target_level": 20, "cost": 35000},
+        {"name": "温神丹·后",  "target_level": 21, "cost": 60000},
+        # 炼虚期
+        {"name": "炼虚丹",    "target_level": 22, "cost": 80000},
+        {"name": "破虚丹·中",  "target_level": 23, "cost": 150000},
+        {"name": "破虚丹·后",  "target_level": 24, "cost": 250000},
+        # 合体期
+        {"name": "合体丹",    "target_level": 25, "cost": 300000},
+        {"name": "融合丹·中",  "target_level": 26, "cost": 500000},
+        {"name": "融合丹·后",  "target_level": 27, "cost": 800000},
+        # 大乘期
+        {"name": "大乘丹",    "target_level": 28, "cost": 1000000},
+        {"name": "悟道丹·中",  "target_level": 29, "cost": 2000000},
+        {"name": "悟道丹·后",  "target_level": 30, "cost": 3500000},
+        # 渡劫期
+        {"name": "渡劫丹",    "target_level": 31, "cost": 5000000},
+        # 仙境
+        {"name": "地仙丹",    "target_level": 32, "cost": 20000000},
+        {"name": "天仙丹",    "target_level": 33, "cost": 80000000},
+        {"name": "大罗金仙丹", "target_level": 34, "cost": 300000000},
+        {"name": "混元丹",    "target_level": 35, "cost": 1000000000},
     ]
 
     async def get_sect_exchange_list(self, user_id: str) -> Tuple[bool, str]:
