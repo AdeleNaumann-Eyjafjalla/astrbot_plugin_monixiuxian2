@@ -1035,7 +1035,7 @@ class XiuXianPlugin(Star):
         async for r in self.combat_handlers.handle_duel(event, target):
             yield r
             
-    @filter.command(CMD_SPAR, "与其他玩家切磋(消耗HP)")
+    @filter.command(CMD_SPAR, "与其他玩家切磋(不影响真实HP)")
     @require_whitelist
     async def handle_spar(self, event: AstrMessageEvent, target: str = ""):
         async for r in self.combat_handlers.handle_spar(event, target):

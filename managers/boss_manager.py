@@ -71,6 +71,7 @@ class BossManager:
     def __init__(self, db: DataBase, combat_mgr: CombatManager, config_manager=None, storage_ring_manager: "StorageRingManager" = None, plugin_config=None):
         self.db = db
         self.combat_mgr = combat_mgr
+        self.config_manager = config_manager  # ConfigManager（含灵根数据等）
         self.storage_ring_manager = storage_ring_manager
         self.config = config_manager.boss_config if config_manager else {}
         self.plugin_config = plugin_config  # AstrBotConfig（插件配置，含HP恢复等）

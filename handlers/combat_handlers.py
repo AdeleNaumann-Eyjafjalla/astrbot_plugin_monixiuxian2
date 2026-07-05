@@ -150,6 +150,36 @@ class CombatHandlers:
             exp=player.experience
         )
 
+    async def _prepare_spar_stats(self, user_id: str) -> CombatStats:
+        """为切磋准备战斗属性（独立HP计算，不写入DB）"""
+        player = await self.db.get_player_by_id(user_id)
+        if not player:
+            return None
+        
+        impart_info = await self.db.ext.get_impart_info(user_id)
+        hp_buff = impart_info.impart_hp_per if impart_info else 0.0
+        mp_buff = impart_info.impart_mp_per if impart_info else 0.0
+        atk_buff = impart_info.impart_atk_per if impart_info else 0.0
+        
+        # 计算属性（满HP/MP，切磋独立计算）
+        hp, mp = self.combat_mgr.calculate_hp_mp(player.experience, hp_buff, mp_buff)
+        base_atk = self.combat_mgr.calculate_atk(player.experience, player.atkpractice, atk_buff)
+        
+        equip_bonus = self._calculate_equipment_bonus(player)
+        final_atk = base_atk + equip_bonus["atk"]
+
+        return CombatStats(
+            user_id=user_id,
+            name=player.user_name if player.user_name else f"道友{user_id}",
+            hp=hp,
+            max_hp=hp,
+            mp=mp,
+            max_mp=mp,
+            atk=final_atk,
+            defense=equip_bonus["defense"],
+            exp=player.experience
+        )
+
     async def handle_duel(self, event: AstrMessageEvent, target: str):
         """决斗 (消耗气血)"""
         user_id = event.get_sender_id()
@@ -221,7 +251,7 @@ class CombatHandlers:
         yield event.plain_result(f"{log}")
 
     async def handle_spar(self, event: AstrMessageEvent, target: str):
-        """切磋 (不消耗气血)"""
+        """切磋 (独立HP计算，不消耗真实HP)"""
         user_id = event.get_sender_id()
         target_id = await self._get_target_id(event, target)
         
@@ -256,27 +286,15 @@ class CombatHandlers:
             yield event.plain_result(f"❌ 切磋冷却中，还需 {remaining} 秒")
             return
 
-        # 切磋前HP随时间恢复
-        if self.config and self.config_manager:
-            p1 = await self.db.get_player_by_id(user_id)
-            p2 = await self.db.get_player_by_id(target_id)
-            if p1:
-                await regenerate_player_hp(p1, self.config, self.config_manager, self.db)
-            if p2:
-                await regenerate_player_hp(p2, self.config, self.config_manager, self.db)
-
-        p1_stats = await self._prepare_combat_stats(user_id)
-        p2_stats = await self._prepare_combat_stats(target_id)
+        # 切磋使用独立HP计算（满HP/MP参与，不读取/不写入真实HP）
+        p1_stats = await self._prepare_spar_stats(user_id)
+        p2_stats = await self._prepare_spar_stats(target_id)
         
         if not p1_stats or not p2_stats:
              yield event.plain_result("❌ 双方都需要踏入修仙之路")
              return
 
         result = self.combat_mgr.player_vs_player(p1_stats, p2_stats, combat_type=1) # 1=切磋
-        
-        # 切磋也消耗HP，保存到数据库（HP只能随时间恢复）
-        await self.db.ext.update_player_hp_mp(user_id, result['player1_final_hp'], result['player1_final_mp'])
-        await self.db.ext.update_player_hp_mp(target_id, result['player2_final_hp'], result['player2_final_mp'])
         
         # 更新冷却
         await self._update_combat_cooldown(user_id, "spar")

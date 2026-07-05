@@ -14,7 +14,7 @@ class MiscHandler:
     async def handle_help(self, event: AstrMessageEvent):
         """显示帮助信息"""
         help_text = (
-            "📖 修仙指令大全 v3.4.4\n"
+            "📖 修仙指令大全 v3.4.5\n"
             "━━━━━━━━━━━━━━━━━━━━━━\n"
             "\n"
             "📖【入门 & 基础】\n"
@@ -153,7 +153,7 @@ class MiscHandler:
             "\n"
             "⚔️【战斗竞技】\n"
             "  切磋 <@某人>\n"
-            "    └─ 友好切磋消耗HP，仅随时间恢复(冷却1分钟)\n"
+            "    └─ 友好切磋，独立HP计算不影响真实HP(冷却1分钟)\n"
             "  决斗 <@某人>\n"
             "    └─ 生死之战败者损修为(冷却5分钟)\n"
             "  世界Boss\n"
