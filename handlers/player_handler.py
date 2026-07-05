@@ -135,7 +135,9 @@ class PlayerHandler:
             f"突破失败或生命值归零会导致\n"
             f"身死道消，所有数据清除！\n"
             f"━━━━━━━━━━━━━━━\n"
-            f"💡 发送「{CMD_PLAYER_INFO}」查看状态"
+            f"⚡ 请先设置你的道号才能使用其他功能！\n"
+            f"发送「/改道号 <道号>」设置你的道号\n"
+            f"道号要求：2-12字，中英文数字下划线"
         )
         yield event.plain_result(reply_msg)
 

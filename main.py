@@ -23,12 +23,18 @@ from .managers import (
 
 
 def require_whitelist(func):
-    """装饰器：检查群聊白名单权限"""
+    """装饰器：检查群聊白名单权限 + 道号强制要求（改道号/帮助除外）"""
     @wraps(func)
     async def wrapper(self, event: AstrMessageEvent, *args, **kwargs):
         if not self._check_access(event):
             await self._send_access_denied_message(event)
             return
+        # 道号强制检查（改道号和帮助指令豁免）
+        if func.__name__ not in ('handle_change_nickname', 'handle_help', 'handle_start_xiuxian'):
+            dao_block = await self._check_dao_name(event)
+            if dao_block:
+                yield dao_block
+                return
         async for result in func(self, event, *args, **kwargs):
             yield result
     return wrapper
@@ -261,6 +267,21 @@ class XiuXianPlugin(Star):
             return True
 
         return False
+
+    async def _check_dao_name(self, event: AstrMessageEvent):
+        """检查玩家是否已设置道号，未设置则返回提示消息"""
+        user_id = event.get_sender_id()
+        try:
+            player = await self.db.get_player_by_id(user_id)
+            if player and not player.user_name:
+                return event.plain_result(
+                    "⚠️ 道友尚未设置道号，无法进行此操作！\n"
+                    "请先使用 /改道号 <你心仪的道号> 设置道号。\n"
+                    "道号要求：2-12字，中英文数字下划线"
+                )
+        except Exception:
+            pass
+        return None
 
     def _check_boss_admin(self, event: AstrMessageEvent) -> bool:
         """检查是否为Boss管理员"""
