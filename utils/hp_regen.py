@@ -1,8 +1,8 @@
 # utils/hp_regen.py
 """
 战斗HP随时间恢复工具
-- HP会根据灵根品质（修炼速度倍率）自动恢复
-- 灵根越好，回血越快
+- HP根据灵根品质按最大HP百分比自动恢复
+- 灵根越好，回血越快（百分比越高）
 - 支持在任意 handler/manager 中调用，自动创建所需的依赖
 """
 
@@ -23,15 +23,18 @@ async def regenerate_player_hp(
     db: Optional["DataBase"] = None
 ) -> int:
     """
-    根据离线时间计算并恢复玩家战斗HP
+    根据离线时间按最大HP百分比计算并恢复玩家战斗HP
 
     HP恢复公式：
-        恢复量 = 经过分钟数 × 基础恢复量/分钟 × 灵根速度倍率
+        恢复量 = 最大HP × 基础恢复百分比/分钟 × 灵根速度倍率 × 经过分钟数
         最终HP = min(当前HP + 恢复量, 最大HP)
+
+    例如：最大HP=1000，百分比=1.5%，灵根=天灵根(1.5x)，离线10分钟
+         恢复量 = 1000 × 0.015 × 1.5 × 10 = 225 HP
 
     Args:
         player: 玩家对象
-        config: AstrBotConfig（插件配置，含HP_REGEN_BASE_PER_MINUTE）
+        config: AstrBotConfig（插件配置，含HP_REGEN_BASE_PER_MINUTE，现为百分比）
         config_manager: ConfigManager（配置管理器，用于读取灵根速度）
         db: 数据库连接（可选，传入则自动持久化）
 
@@ -42,8 +45,8 @@ async def regenerate_player_hp(
 
     now = int(time.time())
 
-    # 获取基础恢复速率（每分钟）
-    base_regen = float(config.get("HP_REGEN_BASE_PER_MINUTE", 5.0))
+    # 获取基础恢复速率（每分钟最大HP百分比，默认1.5%）
+    base_regen_pct = float(config.get("HP_REGEN_BASE_PER_MINUTE", 0.015))
 
     # 获取灵根速度倍率（内部创建 CultivationManager）
     cultivation_manager = CultivationManager(config, config_manager)
@@ -73,8 +76,8 @@ async def regenerate_player_hp(
 
     elapsed_minutes = elapsed_seconds / 60.0
 
-    # 计算恢复量
-    regen_amount = int(elapsed_minutes * base_regen * root_speed)
+    # 按最大HP百分比计算恢复量
+    regen_amount = int(max_hp * base_regen_pct * root_speed * elapsed_minutes)
 
     if regen_amount <= 0:
         return 0
