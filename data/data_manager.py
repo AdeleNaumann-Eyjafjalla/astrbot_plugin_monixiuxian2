@@ -149,8 +149,13 @@ class DataBase:
                 return Player(**filtered_data)
             return None
 
-    async def update_player(self, player: Player):
-        """更新玩家信息"""
+    async def update_player(self, player: Player, external_transaction: bool = False):
+        """更新玩家信息
+        
+        Args:
+            player: 玩家对象
+            external_transaction: 为 True 则不自动 commit，由外部事务统一提交
+        """
         await self.conn.execute(
             """
             UPDATE players SET
@@ -252,7 +257,8 @@ class DataBase:
                 player.user_id
             )
         )
-        await self.conn.commit()
+        if not external_transaction:
+            await self.conn.commit()
 
     async def set_player_state_atomic(self, user_id: str, state: str, cd_type: int, cd_duration: int = 0):
         """原子化更新玩家状态和 user_cd，防止双状态不一致

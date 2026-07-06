@@ -769,17 +769,17 @@ class DatabaseExtended:
             return row[0] if row else 0
     
     async def close_loan(self, loan_id: int):
-        """关闭贷款（标记为已还清）"""
+        """关闭贷款（删除贷款记录，流水保留在 bank_transactions 中）"""
         await self.conn.execute(
-            "UPDATE bank_loans SET status = 'closed' WHERE id = ?",
+            "DELETE FROM bank_loans WHERE id = ?",
             (loan_id,)
         )
         await self.conn.commit()
     
     async def mark_loan_overdue(self, loan_id: int):
-        """标记贷款逾期"""
+        """标记贷款逾期（删除贷款记录，流水保留在 bank_transactions 中）"""
         await self.conn.execute(
-            "UPDATE bank_loans SET status = 'overdue' WHERE id = ?",
+            "DELETE FROM bank_loans WHERE id = ?",
             (loan_id,)
         )
         await self.conn.commit()

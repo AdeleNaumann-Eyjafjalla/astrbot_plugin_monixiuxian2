@@ -212,6 +212,10 @@ class ShopHandler:
                 if success:
                     type_name = {"weapon": "武器", "armor": "防具", "main_technique": "心法", "technique": "功法", "accessory": "饰品"}.get(item_type, "装备")
                     result_lines.append(f"成功购买{type_name}【{target_item['name']}】x{quantity}，已存入储物戒。")
+                    if item_type == "technique":
+                        result_lines.append("💡 使用「装备 功法名」即可装备功法（最多3个）")
+                    elif item_type == "main_technique":
+                        result_lines.append("💡 使用「装备 心法名」即可装备主修心法")
                 else:
                     result_lines.append(f"成功购买【{target_item['name']}】x{quantity}。")
                     result_lines.append(f"⚠️ 存入储物戒失败：{msg}")
@@ -250,7 +254,7 @@ class ShopHandler:
                 player.storage_ring_items = fresh.storage_ring_items
 
             player.gold -= total_price
-            await self.db.update_player(player)
+            await self.db.update_player(player, external_transaction=True)
             await self.db.conn.commit()
             
             result_lines.append(f"花费灵石: {total_price}，剩余: {player.gold}")

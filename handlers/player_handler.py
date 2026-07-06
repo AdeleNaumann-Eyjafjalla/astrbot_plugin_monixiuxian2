@@ -93,16 +93,17 @@ class PlayerHandler:
                                      f"\n💡 可追加「继承」保留死亡前的灵根，如：我要修仙 灵修 继承")
             return
 
-        # 继承灵根：DB + JSON文件双保险读取
+        # 继承遗产：DB + JSON文件双保险读取（灵根+灵石+所有物品）
         inherited_root = None
+        legacy_result = {"gold": 0, "items": 0, "items_list": []}
         if inherit:
-            from ..data.dead_root_store import get_dead_root, clear_dead_root
+            from ..data.dead_root_store import get_dead_root, get_dead_legacy, clear_dead_root, apply_legacy_to_player
             inherited_root = await get_dead_root(self.db, user_id)
             if not inherited_root:
                 yield event.plain_result("❌ 未找到可继承的灵根记录，将随机分配灵根。")
             else:
-                # 清理已消费的记录
-                await clear_dead_root(self.db, user_id)
+                # 先读取遗产数据（在清理前读取完整数据）
+                pass  # apply_legacy_to_player 内部会读取
 
         # 生成新玩家
         new_player = self.cultivation_manager.generate_new_player_stats(
@@ -110,13 +111,34 @@ class PlayerHandler:
         )
         await self.db.create_player(new_player)
 
+        # 应用遗产（灵石+物品合并到储物戒）
+        if inherit and inherited_root:
+            from ..data.dead_root_store import apply_legacy_to_player, clear_dead_root
+            legacy_result = await apply_legacy_to_player(self.db, new_player, user_id)
+            if legacy_result["gold"] > 0 or legacy_result["items"] > 0:
+                # 遗产物品已写入 new_player，需要持久化
+                await self.db.update_player(new_player)
+            # 清理已消费的记录
+            await clear_dead_root(self.db, user_id)
+
         # 获取灵根描述
         root_name = new_player.spiritual_root.replace("灵根", "")
         root_description = self.cultivation_manager._get_root_description(root_name)
 
-        inherit_line = ""
+        # 构建继承信息
+        inherit_lines = []
         if inherited_root:
-            inherit_line = "🔄 继承灵根：保留了死亡前的灵根\n"
+            inherit_lines.append("🔄 继承灵根：保留了死亡前的灵根")
+        if legacy_result["gold"] > 0:
+            inherit_lines.append(f"💰 继承灵石：+{legacy_result['gold']}")
+        if legacy_result["items"] > 0:
+            item_preview = "、".join(legacy_result["items_list"][:5])
+            if len(legacy_result["items_list"]) > 5:
+                item_preview += f" 等{legacy_result['items']}件"
+            inherit_lines.append(f"📦 继承物品：{item_preview}（已存入储物戒）")
+        inherit_line = "\n".join(inherit_lines)
+        if inherit_line:
+            inherit_line += "\n"
 
         reply_msg = (
             f"🎉 恭喜道友 {event.get_sender_name()} 踏上仙途！\n"
@@ -129,7 +151,8 @@ class PlayerHandler:
             f"━━━━━━━━━━━━━━━\n"
             f"⚠️ 修仙有风险，突破需谨慎！\n"
             f"突破失败或生命值归零会导致\n"
-            f"身死道消，所有数据清除！\n"
+            f"身死道消，但使用「继承」可保留\n"
+            f"灵根、灵石和所有物品！\n"
             f"━━━━━━━━━━━━━━━\n"
             f"⚡ 请先设置你的道号才能使用其他功能！\n"
             f"发送「/改道号 <道号>」设置你的道号\n"

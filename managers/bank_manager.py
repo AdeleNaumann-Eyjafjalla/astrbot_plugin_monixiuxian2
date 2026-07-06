@@ -293,18 +293,15 @@ class BankManager:
     
     async def repay(self, player: Player) -> Tuple[bool, str]:
         """还款"""
-        await self.db.conn.execute("BEGIN IMMEDIATE")
         try:
             player = await self.db.get_player_by_id(player.user_id)
             loan_info = await self.get_loan_info(player)
             if not loan_info:
-                await self.db.conn.rollback()
                 return False, "你当前没有需要偿还的贷款。"
             
             total_due = loan_info["total_due"]
             
             if player.gold < total_due:
-                await self.db.conn.rollback()
                 return False, (
                     f"灵石不足！\n"
                     f"应还金额：{total_due:,} 灵石\n"
@@ -316,6 +313,7 @@ class BankManager:
             player.gold -= total_due
             await self.db.update_player(player)
             
+            # 删除贷款记录（不再保留 closed 状态，避免 UNIQUE(user_id, status) 冲突）
             await self.db.ext.close_loan(loan_info["id"])
             
             bank_data = await self.db.ext.get_bank_account(player.user_id)
@@ -327,7 +325,6 @@ class BankManager:
             
             loan_type_name = "突破贷款" if loan_info["loan_type"] == "breakthrough" else "普通贷款"
             
-            await self.db.conn.commit()
             return True, (
                 f"✅ 还款成功！\n"
                 f"━━━━━━━━━━━━━━━\n"
@@ -339,7 +336,6 @@ class BankManager:
                 f"当前持有：{player.gold:,} 灵石"
             )
         except Exception as e:
-            await self.db.conn.rollback()
             raise
     
     async def check_and_process_overdue_loans(self) -> List[dict]:
@@ -361,13 +357,13 @@ class BankManager:
             
             player_name = player.user_name or f"道友{player.user_id[:6]}"
             
-            # 保存灵根供死亡后继承选择（先存后删，DB+文件双保险）
+            # 保存遗产供死亡后继承选择（灵根+灵石+所有物品，先存后删，DB+文件双保险）
             saved_root = player.spiritual_root
             user_id_for_legacy = player.user_id
 
             from ..data.dead_root_store import save_dead_root
-            await save_dead_root(self.db, user_id_for_legacy, saved_root)
-            logger.info(f"[银行定时制裁] 灵根 [{saved_root}] 已保存，user_id={user_id_for_legacy[:8]}")
+            await save_dead_root(self.db, user_id_for_legacy, saved_root, player=player)
+            logger.info(f"[银行定时制裁] 遗产已保存，user_id={user_id_for_legacy[:8]}")
 
             # 删除玩家数据（灵石银行制裁）- 级联删除所有关联数据
             await self.db.delete_player_cascade(user_id_for_legacy)

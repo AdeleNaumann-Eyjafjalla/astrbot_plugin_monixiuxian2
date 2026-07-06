@@ -103,7 +103,7 @@ class StorageRingManager:
 
             items[item_name] = items.get(item_name, 0) + count
             player.set_storage_ring_items(items)
-            await self.db.update_player(player)
+            await self.db.update_player(player, external_transaction=external_transaction)
             if not external_transaction:
                 await self.db.conn.commit()
 
