@@ -284,7 +284,7 @@ class BankManager:
                 f"到期应还：约 {total_due:,} 灵石\n"
                 f"━━━━━━━━━━━━━━━\n"
                 f"当前持有：{player.gold:,} 灵石\n"
-                f"💀 逾期将被银行追杀致死！"
+                f"⚡ 逾期将遭受灵石银行严厉制裁！"
             )
         except Exception as e:
             await self.db.conn.rollback()
@@ -342,7 +342,7 @@ class BankManager:
             raise
     
     async def check_and_process_overdue_loans(self) -> List[dict]:
-        """检查并处理逾期贷款 - 逾期玩家将被银行追杀致死
+        """检查并处理逾期贷款 - 逾期玩家将被灵石银行制裁
         
         Returns:
             处理过的逾期贷款列表
@@ -363,7 +363,7 @@ class BankManager:
             # 保存灵根供死亡后继承选择
             saved_root = player.spiritual_root
             
-            # 删除玩家数据（银行追杀致死）- 级联删除所有关联数据
+            # 删除玩家数据（灵石银行制裁）- 级联删除所有关联数据
             await self.db.delete_player_cascade(player.user_id)
             
             # 存入系统配置，允许玩家选择继承此灵根
@@ -378,7 +378,7 @@ class BankManager:
             # 记录流水
             await self._add_transaction(
                 loan["user_id"], "bank_kill", 0, 0,
-                f"逾期未还款，被银行追杀致死"
+                f"逾期未还款，被灵石银行制裁"
             )
             
             processed.append({

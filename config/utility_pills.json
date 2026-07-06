@@ -588,7 +588,7 @@
     },
     {
         "id": "util_046",
-        "name": "毒煞丹",
+        "name": "寒煞丹",
         "description": "永久增加物伤+500，但寿命-200",
         "rank": "地品",
         "subtype": "permanent_attribute",
@@ -601,7 +601,7 @@
     },
     {
         "id": "util_047",
-        "name": "血煞丹",
+        "name": "玄煞丹",
         "description": "永久增加物伤+1200，但寿命-500",
         "rank": "天品",
         "subtype": "permanent_attribute",
@@ -839,7 +839,7 @@
     },
     {
         "id": "util_065",
-        "name": "燃血丹",
+        "name": "燃元丹",
         "description": "临时增加所有伤害+100%，但每分钟扣除寿命-10，持续10分钟",
         "rank": "地品",
         "subtype": "combat_boost",
@@ -869,7 +869,7 @@
     },
     {
         "id": "util_067",
-        "name": "双修丹",
+        "name": "同修丹",
         "description": "永久增加物伤+200、法伤+200",
         "rank": "天品",
         "subtype": "permanent_attribute",
@@ -1001,7 +1001,7 @@
     },
     {
         "id": "util_076",
-        "name": "神魔丹",
+        "name": "神玄丹",
         "description": "永久增加所有属性+5000",
         "rank": "仙品",
         "subtype": "permanent_attribute",
@@ -1462,7 +1462,7 @@
     },
     {
         "id": "util_110",
-        "name": "献祭丹",
+        "name": "献元丹",
         "description": "永久降低寿命-3000，但增加所有属性+1500",
         "rank": "皇品",
         "subtype": "permanent_attribute",

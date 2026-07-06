@@ -327,7 +327,7 @@
         "type": "pill",
         "subtype": "breakthrough",
         "rank": "仙品",
-        "description": "天仙境界的无上丹药，成功率极低，九死一生",
+        "description": "天仙境界的无上丹药，成功率极低，危险万分",
         "price": 800000000,
         "required_level_index": 32,
         "target_level_index": 33,

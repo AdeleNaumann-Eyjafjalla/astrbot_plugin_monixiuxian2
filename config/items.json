@@ -407,10 +407,10 @@
         "shop_weight": 100
     },
     "1032": {
-        "name": "血煞丹",
+        "name": "玄煞丹",
         "type": "丹药",
         "rank": "珍品",
-        "description": "魔核碎片调和而成，能迅速提升杀伤力，却会侵蚀神魂与防御。",
+        "description": "秘法碎片调和而成，能迅速提升战力，却会侵蚀神魂与防御。",
         "price": 1800,
         "effect": {
             "add_attack": 120,
@@ -544,7 +544,7 @@
         "name": "忘川花",
         "type": "材料",
         "rank": "珍品",
-        "description": "生长于忘川河畔的奇花，既可炼丹也可制毒，药性阴寒。",
+        "description": "生长于忘川河畔的奇花，既可炼丹也可炼制药散，药性阴寒。",
         "price": 3600,
         "shop_weight": 100
     },
@@ -598,11 +598,11 @@
         "shop_weight": 100
     },
     "3005": {
-        "name": "弑神枪",
+        "name": "破神枪",
         "type": "法器",
         "subtype": "武器",
         "rank": "帝品",
-        "description": "传说中的禁忌法器，枪出如龙，有弑神之威。",
+        "description": "传说中的禁忌法器，枪出如龙，有破神之威。",
         "price": 9999999,
         "equip_effects": {
             "attack": 500
@@ -660,7 +660,7 @@
         "shop_weight": 100
     },
     "3010": {
-        "name": "戮仙剑阵",
+        "name": "伏仙剑阵",
         "type": "法器",
         "subtype": "饰品",
         "rank": "帝品",
@@ -697,10 +697,10 @@
         "shop_weight": 20
     },
     "4004": {
-        "name": "不动明王经",
+        "name": "金刚明心经",
         "type": "功法",
         "rank": "珍品",
-        "description": "佛门无上炼体功法，修炼后肉身坚不可摧。",
+        "description": "上古无上炼体功法，修炼后肉身坚不可摧。",
         "price": 10000,
         "shop_weight": 100
     },
@@ -745,10 +745,10 @@
         "shop_weight": 20
     },
     "4010": {
-        "name": "吞天魔功",
+        "name": "噬元天功",
         "type": "功法",
         "rank": "帝品",
-        "description": "魔道无上功法，吞噬万物本源，禁忌的存在。",
+        "description": "远古无上功法，吞噬万物本源，禁忌的存在。",
         "price": 6666666,
         "shop_weight": 20
     },

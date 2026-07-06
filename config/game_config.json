@@ -25,7 +25,7 @@
         "cooldown": 3600,
         "exp_bonus": 0.1,
         "request_expire": 300,
-        "comment": "双修配置：冷却时间（秒）、修为加成比例、请求过期时间"
+        "comment": "同修配置：冷却时间（秒）、修为加成比例、请求过期时间"
     },
     "spirit_eye": {
         "spawn_interval": 7200,

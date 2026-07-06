@@ -337,7 +337,7 @@
         "description": "天灵根死亡倍率",
         "type": "float",
         "default": 10.0,
-        "hint": "天选之子遭天妒，每一级突破都是生死赌博！"
+        "hint": "天选之子遭天妒，每一级突破都是逆天而行！"
       },
       "LEGENDARY_DEATH_MULTIPLIER": {
         "description": "传说级灵根死亡倍率（阴阳/融合）",
@@ -349,7 +349,7 @@
         "description": "神话级灵根死亡倍率（混沌）",
         "type": "float",
         "default": 35.0,
-        "hint": "混沌灵根扰乱天地秩序，突破即是赌命！"
+        "hint": "混沌灵根扰乱天地秩序，突破即是逆天而行！"
       },
       "DIVINE_BODY_DEATH_MULTIPLIER": {
         "description": "禁忌体质死亡倍率（先天道体/神圣体质）",

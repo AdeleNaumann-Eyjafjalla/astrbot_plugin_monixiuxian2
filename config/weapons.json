@@ -136,7 +136,7 @@
   },
   {
     "id": "sword_010",
-    "name": "诛仙仙剑",
+    "name": "破仙仙剑",
     "type": "weapon",
     "weapon_category": "剑",
     "rank": "仙品",
@@ -826,7 +826,7 @@
   },
   {
     "id": "dagger_008",
-    "name": "弑神帝匕",
+    "name": "破神帝匕",
     "type": "weapon",
     "weapon_category": "匕首",
     "rank": "帝品",
@@ -856,7 +856,7 @@
   },
   {
     "id": "dagger_010",
-    "name": "诛仙神匕",
+    "name": "破仙神匕",
     "type": "weapon",
     "weapon_category": "匕首",
     "rank": "仙品",
@@ -1576,7 +1576,7 @@
   },
   {
     "id": "spear_010",
-    "name": "诛仙神枪",
+    "name": "破仙神枪",
     "type": "weapon",
     "weapon_category": "枪",
     "rank": "仙品",
@@ -1606,12 +1606,12 @@
   },
   {
     "id": "spear_012",
-    "name": "鸿蒙弑神枪",
+    "name": "鸿蒙破神枪",
     "type": "weapon",
     "weapon_category": "枪",
     "rank": "混元先天",
     "required_level_index": 35,
-    "description": "鸿蒙时代的弑神之枪",
+    "description": "鸿蒙时代的破神之枪",
     "magic_damage": 5200,
     "physical_damage": 7200,
     "physical_defense": 3200,

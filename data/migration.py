@@ -7,7 +7,7 @@ from typing import Dict, Callable, Awaitable
 from astrbot.api import logger
 from ..config_manager import ConfigManager
 
-LATEST_DB_VERSION = 22  # v22: 添加HP恢复时间戳字段
+LATEST_DB_VERSION = 23  # v23: 物品/装备/丹药名称批量更新（风控敏感词替换）
 
 MIGRATION_TASKS: Dict[int, Callable[[aiosqlite.Connection, ConfigManager], Awaitable[None]]] = {}
 
@@ -773,7 +773,7 @@ async def _migrate_to_v16(conn: aiosqlite.Connection, config_manager: ConfigMana
     """)
     await conn.execute("CREATE INDEX IF NOT EXISTS idx_spirit_farms_user ON spirit_farms(user_id)")
     
-    # 双修记录表
+    # 同修记录表
     await conn.execute("""
         CREATE TABLE IF NOT EXISTS dual_cultivation (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -812,7 +812,7 @@ async def _migrate_to_v16(conn: aiosqlite.Connection, config_manager: ConfigMana
         )
     
     await conn.commit()
-    logger.info("v16迁移完成：Phase 4 扩展功能（洞天福地、灵田、双修、灵眼）")
+    logger.info("v16迁移完成：Phase 4 扩展功能（洞天福地、灵田、同修、灵眼）")
 
 @migration(17)
 async def _migrate_to_v17(conn: aiosqlite.Connection, config_manager: ConfigManager):
@@ -985,7 +985,7 @@ async def _migrate_to_v20(conn: aiosqlite.Connection, config_manager: ConfigMana
     # 添加last_collect_time字段到spirit_eyes表（修复灵眼收取时间计算）
     await safe_add_column(conn, "spirit_eyes", "last_collect_time INTEGER")
     
-    # 添加双修请求持久化表
+    # 添加同修请求持久化表
     await conn.execute("""
         CREATE TABLE IF NOT EXISTS dual_cultivation_requests (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -1038,3 +1038,156 @@ async def _migrate_to_v22(conn: aiosqlite.Connection, config_manager: ConfigMana
 
     await conn.commit()
     logger.info("v22迁移完成：添加HP恢复时间戳字段")
+
+# ---- 物品名称映射（风控敏感词替换） ----
+_RENAME_MAP = {
+    "弑神枪": "破神枪",
+    "戮仙剑阵": "伏仙剑阵",
+    "不动明王经": "金刚明心经",
+    "吞天魔功": "噬元天功",
+    "毒煞丹": "寒煞丹",
+    "血煞丹": "玄煞丹",
+    "燃血丹": "燃元丹",
+    "神魔丹": "神玄丹",
+    "献祭丹": "献元丹",
+    "双修丹": "同修丹",
+    "诛仙仙剑": "破仙仙剑",
+    "弑神帝匕": "破神帝匕",
+    "诛仙神匕": "破仙神匕",
+    "诛仙神枪": "破仙神枪",
+    "鸿蒙弑神枪": "鸿蒙破神枪",
+}
+
+def _rename_item(name: str) -> str:
+    """重命名单个物品名称"""
+    return _RENAME_MAP.get(name, name)
+
+def _rename_json_keys(json_str: str) -> str:
+    """重命名 JSON 字典中的 key（如 pills_inventory, storage_ring_items）"""
+    if not json_str or json_str == "{}":
+        return json_str
+    try:
+        data = json.loads(json_str)
+        if isinstance(data, dict):
+            new_data = {_rename_item(k): v for k, v in data.items()}
+            return json.dumps(new_data, ensure_ascii=False)
+        return json_str
+    except (json.JSONDecodeError, TypeError):
+        return json_str
+
+def _rename_json_array(json_str: str) -> str:
+    """重命名 JSON 数组中的字符串元素（如 techniques）"""
+    if not json_str or json_str == "[]":
+        return json_str
+    try:
+        data = json.loads(json_str)
+        if isinstance(data, list):
+            new_data = [_rename_item(item) for item in data]
+            return json.dumps(new_data, ensure_ascii=False)
+        return json_str
+    except (json.JSONDecodeError, TypeError):
+        return json_str
+
+def _rename_enhance_dict(json_str: str) -> str:
+    """重命名 equipment_enhance JSON 中的装备名称 key"""
+    if not json_str or json_str == "{}":
+        return json_str
+    try:
+        data = json.loads(json_str)
+        if isinstance(data, dict):
+            new_data = {_rename_item(k): v for k, v in data.items()}
+            return json.dumps(new_data, ensure_ascii=False)
+        return json_str
+    except (json.JSONDecodeError, TypeError):
+        return json_str
+
+
+@migration(23)
+async def _migrate_to_v23(conn: aiosqlite.Connection, config_manager: ConfigManager):
+    """迁移到v23 - 批量更新物品/装备/丹药名称（风控敏感词替换）"""
+    logger.info("开始迁移到v23：批量更新物品/装备/丹药名称")
+
+    # 统计
+    stats = {"players_updated": 0, "items_renamed": 0, "gifts_renamed": 0}
+
+    # 1. 更新 players 表中的物品名称
+    async with conn.execute(
+        "SELECT user_id, weapon, armor, main_technique, techniques, "
+        "pills_inventory, storage_ring_items, equipment_enhance FROM players"
+    ) as cursor:
+        players = await cursor.fetchall()
+
+    for row in players:
+        user_id = row[0]
+        weapon, armor, main_tech, techniques = row[1], row[2], row[3], row[4]
+        pills_inv, storage_items, enhance = row[5], row[6], row[7]
+
+        new_weapon = _rename_item(weapon)
+        new_armor = _rename_item(armor)
+        new_main_tech = _rename_item(main_tech)
+        new_techniques = _rename_json_array(techniques)
+        new_pills = _rename_json_keys(pills_inv)
+        new_storage = _rename_json_keys(storage_items)
+        new_enhance = _rename_enhance_dict(enhance)
+
+        item_renamed = (
+            new_weapon != weapon or new_armor != armor
+            or new_main_tech != main_tech or new_techniques != techniques
+            or new_pills != pills_inv or new_storage != storage_items
+            or new_enhance != enhance
+        )
+
+        if item_renamed:
+            await conn.execute(
+                "UPDATE players SET weapon=?, armor=?, main_technique=?, techniques=?, "
+                "pills_inventory=?, storage_ring_items=?, equipment_enhance=? WHERE user_id=?",
+                (new_weapon, new_armor, new_main_tech, new_techniques,
+                 new_pills, new_storage, new_enhance, user_id)
+            )
+            stats["players_updated"] += 1
+            stats["items_renamed"] += 1
+            logger.debug(f"已更新玩家 {user_id[:8]} 的物品名称")
+
+    # 2. 更新 pending_gifts 表中的 item_name
+    async with conn.execute("SELECT id, item_name FROM pending_gifts") as cursor:
+        gifts = await cursor.fetchall()
+
+    for gift_id, item_name in gifts:
+        new_name = _rename_item(item_name)
+        if new_name != item_name:
+            await conn.execute(
+                "UPDATE pending_gifts SET item_name=? WHERE id=?",
+                (new_name, gift_id)
+            )
+            stats["gifts_renamed"] += 1
+
+    # 3. 更新 shop 表中的 current_items
+    async with conn.execute("SELECT shop_id, current_items FROM shop") as cursor:
+        shops = await cursor.fetchall()
+
+    for shop_id, current_items_str in shops:
+        if not current_items_str or current_items_str == "[]":
+            continue
+        try:
+            items = json.loads(current_items_str)
+            changed = False
+            for item in items:
+                if isinstance(item, dict) and "name" in item:
+                    new_name = _rename_item(item["name"])
+                    if new_name != item["name"]:
+                        item["name"] = new_name
+                        changed = True
+            if changed:
+                new_items_str = json.dumps(items, ensure_ascii=False)
+                await conn.execute(
+                    "UPDATE shop SET current_items=? WHERE shop_id=?",
+                    (new_items_str, shop_id)
+                )
+        except (json.JSONDecodeError, TypeError):
+            pass
+
+    await conn.commit()
+    logger.info(
+        f"v23迁移完成：已更新 {stats['players_updated']} 个玩家、"
+        f"{stats['gifts_renamed']} 条赠予请求"
+    )

@@ -77,10 +77,10 @@ ADVENTURING_BLOCKED_COMMANDS = [
     "职位变更",
     # 炼丹（耗时活动）
     "炼丹",
-    # 双修
-    "双修",
-    "接受双修",
-    "拒绝双修",
+    # 同修
+    "同修",
+    "接受同修",
+    "拒绝同修",
     # 传承挑战
     "传承挑战",
     # 悬赏接取
@@ -111,7 +111,7 @@ def player_required(func: Callable[..., Coroutine[any, any, AsyncGenerator[any, 
         loan_warning = await _check_loan_status(self.db, player)
         if loan_warning:
             if loan_warning.get("is_dead"):
-                # 玩家因逾期被追杀，删除数据
+                # 玩家因逾期被制裁，删除数据
                 yield event.plain_result(loan_warning["message"])
                 return
         
@@ -210,7 +210,7 @@ async def _check_loan_status(db, player: Player) -> dict:
                 # 记录流水
                 await db.ext.add_bank_transaction(
                     player.user_id, "bank_kill", 0, 0,
-                    "逾期未还款，被银行追杀致死", now
+                    "逾期未还款，被灵石银行制裁", now
                 )
                 
                 await db.conn.commit()
@@ -220,12 +220,12 @@ async def _check_loan_status(db, player: Player) -> dict:
                 return {
                     "is_dead": True,
                     "message": (
-                        f"💀 银行追杀令 💀\n"
+                        f"⚡ 灵石银行制裁令 ⚡\n"
                         f"━━━━━━━━━━━━━━━\n"
                         f"道友【{player_name}】因{loan_type_name}逾期未还\n"
                         f"欠款本金：{loan['principal']:,} 灵石\n"
                         f"━━━━━━━━━━━━━━━\n"
-                        f"银行派出的追杀者已将你击杀！\n"
+                        f"灵石银行已收回所有借贷修为\n"
                         f"所有修为和装备化为虚无...\n"
                         f"━━━━━━━━━━━━━━━\n"
                         f"若想重新修仙，请使用「我要修仙」命令"
@@ -263,7 +263,7 @@ async def _check_loan_status(db, player: Player) -> dict:
             f"{urgency}【{loan_type_name}还款提醒】\n"
             f"应还金额：{total_due:,} 灵石\n"
             f"剩余时间：{time_str}\n"
-            f"⚠️ 逾期将被银行追杀致死！\n"
+            f"⚠️ 逾期将遭受灵石银行严厉制裁！\n"
             f"请使用 /还款 命令还款"
         )
         

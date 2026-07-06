@@ -1,5 +1,5 @@
 # handlers/dual_cultivation_handlers.py
-"""双修处理器"""
+"""同修处理器"""
 import re
 from astrbot.api.event import AstrMessageEvent
 from ..data import DataBase
@@ -11,7 +11,7 @@ __all__ = ["DualCultivationHandlers"]
 
 
 class DualCultivationHandlers:
-    """双修处理器"""
+    """同修处理器"""
     
     def __init__(self, db: DataBase, dual_mgr: DualCultivationManager):
         self.db = db
@@ -19,16 +19,16 @@ class DualCultivationHandlers:
     
     @player_required
     async def handle_dual_request(self, player: Player, event: AstrMessageEvent, target: str = ""):
-        """发起双修"""
+        """发起同修"""
         target_id = self._extract_user_id(target)
         if not target_id:
             yield event.plain_result(
-                "💕 双修系统\n"
+                "💕 同修系统\n"
                 "━━━━━━━━━━━━━━━\n"
-                "与他人双修可获得对方10%的修为！\n"
+                "与他人同修可获得对方10%的修为！\n"
                 "冷却时间：1小时\n"
                 "━━━━━━━━━━━━━━━\n"
-                "💡 使用 /双修 @某人"
+                "💡 使用 /同修 @某人"
             )
             return
         
@@ -37,13 +37,13 @@ class DualCultivationHandlers:
     
     @player_required
     async def handle_accept(self, player: Player, event: AstrMessageEvent):
-        """接受双修"""
+        """接受同修"""
         success, msg = await self.mgr.accept_request(player)
         yield event.plain_result(msg)
     
     @player_required
     async def handle_reject(self, player: Player, event: AstrMessageEvent):
-        """拒绝双修"""
+        """拒绝同修"""
         success, msg = await self.mgr.reject_request(player.user_id)
         yield event.plain_result(msg)
     

@@ -160,10 +160,10 @@ CMD_SPIRIT_FARM_PLANT = "种植"
 CMD_SPIRIT_FARM_HARVEST = "收获"
 CMD_SPIRIT_FARM_UPGRADE = "升级灵田"
 
-# Phase 4: 双修
-CMD_DUAL_CULT_REQUEST = "双修"
-CMD_DUAL_CULT_ACCEPT = "接受双修"
-CMD_DUAL_CULT_REJECT = "拒绝双修"
+# Phase 4: 同修
+CMD_DUAL_CULT_REQUEST = "同修"
+CMD_DUAL_CULT_ACCEPT = "接受同修"
+CMD_DUAL_CULT_REJECT = "拒绝同修"
 
 # Phase 4: 灵眼
 CMD_SPIRIT_EYE_INFO = "灵眼信息"
@@ -498,7 +498,7 @@ class XiuXianPlugin(Star):
                 
                 if processed:
                     logger.info(f"【修仙插件】处理了 {len(processed)} 笔逾期贷款")
-                    # 广播逾期玩家被追杀的消息
+                    # 广播逾期玩家被制裁的消息
                     for loan_info in processed:
                         if loan_info.get("death"):
                             await self._broadcast_loan_death(loan_info)
@@ -516,7 +516,7 @@ class XiuXianPlugin(Star):
                 await asyncio.sleep(delay)
 
     async def _broadcast_loan_death(self, loan_info: dict):
-        """广播贷款逾期玩家被追杀的消息"""
+        """广播贷款逾期玩家被制裁的消息"""
         from astrbot.api.event import MessageChain
         
         if not self.whitelist_groups:
@@ -526,11 +526,11 @@ class XiuXianPlugin(Star):
         principal = loan_info.get("principal", 0)
         
         broadcast_msg = (
-            f"💀 银行追杀公告 💀\n"
+            f"⚡ 灵石银行制裁公告 ⚡\n"
             f"━━━━━━━━━━━━━━━\n"
             f"修士【{player_name}】因贷款逾期未还\n"
             f"欠款：{principal:,} 灵石\n"
-            f"已被灵石银行追杀致死！\n"
+            f"已被灵石银行严厉制裁！\n"
             f"━━━━━━━━━━━━━━━\n"
             f"⚠️ 借贷有风险，还款需及时！"
         )
@@ -546,9 +546,9 @@ class XiuXianPlugin(Star):
                     try:
                         await self.context.send_message(umo, message_chain)
                     except Exception as e:
-                        logger.warning(f"【修仙插件】贷款追杀广播发送失败 (群{group_id}): {e}")
+                        logger.warning(f"【修仙插件】贷款制裁广播发送失败 (群{group_id}): {e}")
         except Exception as e:
-            logger.error(f"【修仙插件】贷款追杀广播异常: {e}")
+            logger.error(f"【修仙插件】贷款制裁广播异常: {e}")
 
     async def _schedule_spirit_eye_spawn(self):
         """灵眼定时任务（每2小时：自动收税 + 生成新灵眼，支持指数退避）"""
@@ -1289,20 +1289,20 @@ class XiuXianPlugin(Star):
         async for r in self.spirit_farm_handlers.handle_upgrade_farm(event):
             yield r
 
-    # ===== Phase 4: 双修 =====
-    @filter.command(CMD_DUAL_CULT_REQUEST, "发起双修")
+    # ===== Phase 4: 同修 =====
+    @filter.command(CMD_DUAL_CULT_REQUEST, "发起同修")
     @require_whitelist
     async def handle_dual_cult_request(self, event: AstrMessageEvent, target: str = ""):
         async for r in self.dual_cult_handlers.handle_dual_request(event, target):
             yield r
 
-    @filter.command(CMD_DUAL_CULT_ACCEPT, "接受双修")
+    @filter.command(CMD_DUAL_CULT_ACCEPT, "接受同修")
     @require_whitelist
     async def handle_dual_cult_accept(self, event: AstrMessageEvent):
         async for r in self.dual_cult_handlers.handle_accept(event):
             yield r
 
-    @filter.command(CMD_DUAL_CULT_REJECT, "拒绝双修")
+    @filter.command(CMD_DUAL_CULT_REJECT, "拒绝同修")
     @require_whitelist
     async def handle_dual_cult_reject(self, event: AstrMessageEvent):
         async for r in self.dual_cult_handlers.handle_reject(event):
