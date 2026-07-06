@@ -3,7 +3,7 @@ import time
 import random
 from datetime import datetime
 from astrbot.api.event import AstrMessageEvent
-from astrbot.api import AstrBotConfig
+from astrbot.api import AstrBotConfig, logger
 from ..data import DataBase
 from ..core import CultivationManager, PillManager
 from ..models import Player
@@ -98,16 +98,18 @@ class PlayerHandler:
         if inherit:
             try:
                 inherited_root = await self.db.ext.get_system_config(f"dead_root_{user_id}")
-            except Exception:
-                pass
+                logger.info(f"[继承灵根] 玩家 {user_id[:8]} 读取灵根记录: {inherited_root}")
+            except Exception as e:
+                logger.error(f"[继承灵根] 玩家 {user_id[:8]} 读取灵根记录失败: {e}", exc_info=True)
             if not inherited_root:
                 yield event.plain_result("❌ 未找到可继承的灵根记录，将随机分配灵根。")
             else:
                 # 清理系统配置
                 try:
                     await self.db.ext.set_system_config(f"dead_root_{user_id}", "")
-                except Exception:
-                    pass
+                    logger.info(f"[继承灵根] 玩家 {user_id[:8]} 已消费灵根记录 [{inherited_root}]")
+                except Exception as e:
+                    logger.error(f"[继承灵根] 玩家 {user_id[:8]} 清理灵根记录失败: {e}", exc_info=True)
 
         # 生成新玩家
         new_player = self.cultivation_manager.generate_new_player_stats(

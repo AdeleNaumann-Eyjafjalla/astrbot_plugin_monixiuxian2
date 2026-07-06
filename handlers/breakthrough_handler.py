@@ -206,7 +206,7 @@ class BreakthroughHandler:
             combined_death_mult
         )
 
-        # 扣除破境丹（突破成功/失败后都要消耗）
+        # 扣除破境丹（突破成功/失败后都要消耗，但死亡时不扣）
         if pill_name and not died:
             inventory = player.get_pills_inventory()
             if pill_name in inventory and inventory.get(pill_name, 0) > 0:
@@ -216,7 +216,8 @@ class BreakthroughHandler:
                 player.set_pills_inventory(inventory)
                 await self.db.update_player(player)
 
-        if modifiers["has_temp_effects"]:
+        # 移除临时丹药效果（但死亡时玩家数据已删除，跳过避免 update 空行）
+        if modifiers["has_temp_effects"] and not died:
             await self.pill_manager.consume_breakthrough_effects(player)
 
         yield event.plain_result(message)

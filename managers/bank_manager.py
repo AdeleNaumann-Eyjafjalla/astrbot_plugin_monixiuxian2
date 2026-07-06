@@ -1,6 +1,7 @@
 # managers/bank_manager.py
 """灵石银行系统管理器 - 包含存取款、贷款、流水记录功能"""
 import time
+from astrbot.api import logger
 from decimal import Decimal, ROUND_DOWN
 from typing import Tuple, List, Optional
 from ..data import DataBase
@@ -360,17 +361,19 @@ class BankManager:
             
             player_name = player.user_name or f"道友{player.user_id[:6]}"
             
-            # 保存灵根供死亡后继承选择
+            # 保存灵根供死亡后继承选择（先存后删，防止删除后写入失败导致灵根丢失）
             saved_root = player.spiritual_root
-            
-            # 删除玩家数据（灵石银行制裁）- 级联删除所有关联数据
-            await self.db.delete_player_cascade(player.user_id)
-            
-            # 存入系统配置，允许玩家选择继承此灵根
+            user_id_for_legacy = player.user_id
+
+            # 先存入系统配置，再删除玩家数据
             try:
-                await self.db.ext.set_system_config(f"dead_root_{player.user_id}", saved_root)
-            except Exception:
-                pass
+                await self.db.ext.set_system_config(f"dead_root_{user_id_for_legacy}", saved_root)
+                logger.info(f"[银行定时制裁] 已保存玩家 {user_id_for_legacy[:8]} 的灵根 [{saved_root}] 供继承")
+            except Exception as e:
+                logger.error(f"[银行定时制裁] 保存玩家 {user_id_for_legacy[:8]} 灵根到系统配置失败: {e}", exc_info=True)
+
+            # 删除玩家数据（灵石银行制裁）- 级联删除所有关联数据
+            await self.db.delete_player_cascade(user_id_for_legacy)
             
             # 标记贷款逾期
             await self.db.ext.mark_loan_overdue(loan["id"])
