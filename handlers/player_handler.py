@@ -3,7 +3,7 @@ import time
 import random
 from datetime import datetime
 from astrbot.api.event import AstrMessageEvent
-from astrbot.api import AstrBotConfig, logger
+from astrbot.api import AstrBotConfig
 from ..data import DataBase
 from ..core import CultivationManager, PillManager
 from ..models import Player
@@ -93,23 +93,16 @@ class PlayerHandler:
                                      f"\n💡 可追加「继承」保留死亡前的灵根，如：我要修仙 灵修 继承")
             return
 
-        # 继承灵根：从系统配置读取死亡时保存的灵根
+        # 继承灵根：DB + JSON文件双保险读取
         inherited_root = None
         if inherit:
-            try:
-                inherited_root = await self.db.ext.get_system_config(f"dead_root_{user_id}")
-                logger.info(f"[继承灵根] 玩家 {user_id[:8]} 读取灵根记录: {inherited_root}")
-            except Exception as e:
-                logger.error(f"[继承灵根] 玩家 {user_id[:8]} 读取灵根记录失败: {e}", exc_info=True)
+            from ..data.dead_root_store import get_dead_root, clear_dead_root
+            inherited_root = await get_dead_root(self.db, user_id)
             if not inherited_root:
                 yield event.plain_result("❌ 未找到可继承的灵根记录，将随机分配灵根。")
             else:
-                # 清理系统配置
-                try:
-                    await self.db.ext.set_system_config(f"dead_root_{user_id}", "")
-                    logger.info(f"[继承灵根] 玩家 {user_id[:8]} 已消费灵根记录 [{inherited_root}]")
-                except Exception as e:
-                    logger.error(f"[继承灵根] 玩家 {user_id[:8]} 清理灵根记录失败: {e}", exc_info=True)
+                # 清理已消费的记录
+                await clear_dead_root(self.db, user_id)
 
         # 生成新玩家
         new_player = self.cultivation_manager.generate_new_player_stats(
