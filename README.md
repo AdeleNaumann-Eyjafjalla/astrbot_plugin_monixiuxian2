@@ -4,7 +4,7 @@
   <img src="logo.png" alt="模拟修仙" width="200">
 </p>
 
-> **版本:** v3.5.1  
+> **版本:** v3.5.3  
 > **许可证:** AGPL-3.0  
 > **作者:** AdeleNaumann  
 > **基于:** [nonebot_plugin_xiuxian_2](https://github.com/xiuxian-2/nonebot_plugin_xiuxian_2) (部分借鉴与重构)
@@ -314,6 +314,28 @@ astrbot_plugin_monixiuxian2/
 ---
 
 ## 📝 更新日志
+
+### v3.5.3 - 战斗装备属性加成修复
+
+**🛠 BUG 修复（两处关键）**
+
+| 问题 | 根因 | 修复 |
+|------|------|------|
+| 战斗中 items.json 武器（青锋剑/烈阳刀/破神枪等）攻击加成始终为 0 | `_calculate_equipment_bonus` 只在 `weapons_data` 中查找，但 items.json 武器在 `items_data` | 同时检查 `weapons_data` 和 `items_data` |
+| 战斗中 items.json 防具（玄铁甲/月华袍/泰坦之铠等）防御加成始终为 0 | 直接读 `physical_defense`，但旧格式防具属性存在 `equip_effects.defense` | 增加旧格式 `equip_effects` 兼容读取 |
+
+> 注："我的信息"面板显示正确（使用 `parse_item_from_name` 做了格式转换），仅战斗计算漏了。本次修复后战斗攻防将与面板显示一致。
+
+### v3.5.2 - 功法装备显示修复
+
+**🛠 BUG 修复**
+
+| 问题 | 原因 | 修复 |
+|------|------|------|
+| "我的信息"不显示已装备的功法 | 装备区只渲染了 `main_technique`，`techniques` 功法列表（最多3个）从未展示 | 新增 `功法：xxx (n/3)` 行，同时显示主修心法和辅修功法 |
+
+> 两种装备方式：`装备 主修 功法名` → 主修心法栏（1个）；`装备 功法名` → 功法栏（最多3个）。
+> 所有已装备功法现在都能在「我的信息」中看到。
 
 ### v3.5.1 - 功法属性加成修复
 

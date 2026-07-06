@@ -218,6 +218,9 @@ class PlayerHandler:
         weapon_name = player.weapon if player.weapon else "无"
         armor_name = player.armor if player.armor else "无"
         technique_name = player.main_technique if player.main_technique else "无"
+        techniques_list = player.get_techniques_list()
+        techniques_display = "、".join(techniques_list) if techniques_list else "无"
+        techniques_count = f"({len(techniques_list)}/3)"
         
         # 获取突破状态
         breakthrough_rate = f"+{player.level_up_rate}%" if player.level_up_rate > 0 else "0%"
@@ -274,6 +277,7 @@ class PlayerHandler:
             f"\n"
             f"【装备信息】\n"
             f"  主修功法：{technique_name}\n"
+            f"  功法：{techniques_display} {techniques_count}\n"
             f"  法器：{weapon_name}\n"
             f"  防具：{armor_name}\n"
             f"\n"

@@ -92,23 +92,40 @@ class CombatHandlers:
         return None
 
     def _calculate_equipment_bonus(self, player) -> dict:
-        """计算装备提供的属性加成（武器 + 防具 + 主修心法 + 功法列表）"""
+        """计算装备提供的属性加成（武器 + 防具 + 主修心法 + 功法列表）
+
+        兼容两种数据源和格式：
+        - items.json（旧格式 equip_effects.attack/defense）→ items_data
+        - weapons.json（新格式 physical_damage/magic_damage）→ weapons_data
+        """
         bonus = {"atk": 0, "defense": 0}
         if not self.config_manager:
             return bonus
-            
-        # 武器
-        if player.weapon and player.weapon in self.config_manager.weapons_data:
-            data = self.config_manager.weapons_data[player.weapon]
-            bonus["atk"] += data.get("atk", 0)
-            bonus["atk"] += data.get("physical_damage", 0)
-            bonus["atk"] += data.get("magic_damage", 0)
-        
-        # 防具
-        if player.armor and player.armor in self.config_manager.items_data:
-            data = self.config_manager.items_data[player.armor]
-            bonus["defense"] += data.get("physical_defense", 0)
-            bonus["defense"] += data.get("magic_defense", 0)
+
+        # 武器 — 同时检查 weapons_data 和 items_data，兼容旧格式 equip_effects
+        if player.weapon:
+            data = self.config_manager.weapons_data.get(player.weapon)
+            if not data:
+                data = self.config_manager.items_data.get(player.weapon)
+            if data:
+                # 新格式
+                bonus["atk"] += data.get("physical_damage", 0)
+                bonus["atk"] += data.get("magic_damage", 0)
+                bonus["atk"] += data.get("atk", 0)
+                # 旧格式兼容 (items.json 法器 equip_effects)
+                if "equip_effects" in data:
+                    bonus["atk"] += data["equip_effects"].get("attack", 0)
+
+        # 防具 — 兼容旧格式 equip_effects
+        if player.armor:
+            data = self.config_manager.items_data.get(player.armor)
+            if data:
+                # 新格式
+                bonus["defense"] += data.get("physical_defense", 0)
+                bonus["defense"] += data.get("magic_defense", 0)
+                # 旧格式兼容 (items.json 法器 equip_effects)
+                if "equip_effects" in data:
+                    bonus["defense"] += data["equip_effects"].get("defense", 0)
 
         # 主修心法 + 功法列表
         technique_names = []
@@ -124,7 +141,7 @@ class CombatHandlers:
             bonus["atk"] += data.get("physical_damage", 0)
             bonus["defense"] += data.get("magic_defense", 0)
             bonus["defense"] += data.get("physical_defense", 0)
-            
+
         return bonus
 
     async def _prepare_combat_stats(self, user_id: str) -> CombatStats:
