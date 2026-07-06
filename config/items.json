@@ -678,6 +678,8 @@
         "rank": "凡品",
         "description": "一部基础的吐纳法门，修炼后可延年益寿。",
         "price": 1000,
+        "exp_multiplier": 0.05,
+        "spiritual_qi": 15,
         "shop_weight": 1000
     },
     "4002": {
@@ -686,6 +688,9 @@
         "rank": "圣品",
         "description": "传说中可焚尽万物的无上功法，此为上卷。",
         "price": 888888,
+        "magic_damage": 60,
+        "exp_multiplier": 0.20,
+        "spiritual_qi": 150,
         "shop_weight": 100
     },
     "4003": {
@@ -694,6 +699,11 @@
         "rank": "帝品",
         "description": "无上秘法，可演化万物，神秘莫测。",
         "price": 9999999,
+        "magic_damage": 80,
+        "physical_damage": 80,
+        "exp_multiplier": 0.30,
+        "spiritual_qi": 300,
+        "blood_qi": 300,
         "shop_weight": 20
     },
     "4004": {
@@ -702,38 +712,54 @@
         "rank": "珍品",
         "description": "上古无上炼体功法，修炼后肉身坚不可摧。",
         "price": 10000,
+        "physical_defense": 25,
+        "blood_qi": 80,
+        "exp_multiplier": 0.10,
         "shop_weight": 100
     },
     "4005": {
         "name": "御风诀",
         "type": "功法",
         "rank": "凡品",
-        "description": "修炼后身轻如燕，提升移动速度（暂无实际效果）。",
+        "description": "修炼后身轻如燕，提升移动速度与身法。",
         "price": 1200,
+        "physical_damage": 8,
+        "exp_multiplier": 0.03,
         "shop_weight": 1000
     },
     "4006": {
         "name": "龟息功",
         "type": "功法",
         "rank": "凡品",
-        "description": "模拟玄龟呼吸，修炼后气息绵长，提升耐力（暂无实际效果）。",
+        "description": "模拟玄龟呼吸，修炼后气息绵长，提升耐力与防御。",
         "price": 900,
+        "physical_defense": 8,
+        "blood_qi": 15,
+        "exp_multiplier": 0.03,
         "shop_weight": 1000
     },
     "4007": {
         "name": "北冥神功",
         "type": "功法",
         "rank": "珍品",
-        "description": "能吸取他人修为化为己用，霸道无比（暂无实际效果）。",
+        "description": "能吸取他人修为化为己用，霸道无比。",
         "price": 25000,
+        "magic_damage": 25,
+        "exp_multiplier": 0.12,
+        "spiritual_qi": 60,
         "shop_weight": 100
     },
     "4008": {
         "name": "九阳神功",
         "type": "功法",
         "rank": "珍品",
-        "description": "至刚至阳的内功心法，百毒不侵。",
+        "description": "至刚至阳的内功心法，百毒不侵，攻防兼备。",
         "price": 22000,
+        "magic_damage": 20,
+        "physical_damage": 20,
+        "exp_multiplier": 0.10,
+        "spiritual_qi": 50,
+        "blood_qi": 50,
         "shop_weight": 100
     },
     "4009": {
@@ -742,6 +768,10 @@
         "rank": "帝品",
         "description": "阐述了天地至理的无上经文，为万法之源。",
         "price": 7777777,
+        "magic_damage": 100,
+        "exp_multiplier": 0.40,
+        "spiritual_qi": 400,
+        "mental_power": 30,
         "shop_weight": 20
     },
     "4010": {
@@ -750,6 +780,10 @@
         "rank": "帝品",
         "description": "远古无上功法，吞噬万物本源，禁忌的存在。",
         "price": 6666666,
+        "magic_damage": 120,
+        "exp_multiplier": 0.25,
+        "spiritual_qi": 250,
+        "blood_qi": 350,
         "shop_weight": 20
     },
     "5001": {

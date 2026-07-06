@@ -92,7 +92,7 @@ class CombatHandlers:
         return None
 
     def _calculate_equipment_bonus(self, player) -> dict:
-        """计算装备提供的属性加成"""
+        """计算装备提供的属性加成（武器 + 防具 + 主修心法 + 功法列表）"""
         bonus = {"atk": 0, "defense": 0}
         if not self.config_manager:
             return bonus
@@ -109,6 +109,21 @@ class CombatHandlers:
             data = self.config_manager.items_data[player.armor]
             bonus["defense"] += data.get("physical_defense", 0)
             bonus["defense"] += data.get("magic_defense", 0)
+
+        # 主修心法 + 功法列表
+        technique_names = []
+        if player.main_technique:
+            technique_names.append(player.main_technique)
+        technique_names.extend(player.get_techniques_list())
+
+        for tech_name in technique_names:
+            data = self.config_manager.items_data.get(tech_name)
+            if not data:
+                continue
+            bonus["atk"] += data.get("magic_damage", 0)
+            bonus["atk"] += data.get("physical_damage", 0)
+            bonus["defense"] += data.get("magic_defense", 0)
+            bonus["defense"] += data.get("physical_defense", 0)
             
         return bonus
 

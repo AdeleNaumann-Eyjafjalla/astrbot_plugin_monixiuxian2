@@ -145,6 +145,7 @@ class EquipmentManager:
             lv = enhance_data.get(player.main_technique, 0)
             item = self.parse_item_from_name(player.main_technique, items_data, weapons_data, enhance_level=lv)
             if item:
+                item.item_type = "main_technique"  # 标记为主修心法以启用专属属性
                 equipped.append(item)
 
         # 功法列表
