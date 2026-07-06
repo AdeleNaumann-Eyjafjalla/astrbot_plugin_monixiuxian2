@@ -37,10 +37,11 @@ __all__ = ["StorageRingHandler"]
 class StorageRingHandler:
     """储物戒系统处理器"""
 
-    def __init__(self, db: DataBase, config_manager: ConfigManager):
+    def __init__(self, db: DataBase, config_manager: ConfigManager, pill_manager=None):
         self.db = db
         self.config_manager = config_manager
         self.storage_ring_manager = StorageRingManager(db, config_manager)
+        self.pill_manager = pill_manager  # 丹药管理器，用于丹药赠予
 
     @player_required
     async def handle_storage_ring(self, player: Player, event: AstrMessageEvent):
@@ -171,7 +172,7 @@ class StorageRingHandler:
 
     @player_required
     async def handle_gift_item(self, player: Player, event: AstrMessageEvent, args: str):
-        """赠予物品给其他玩家"""
+        """赠予物品/丹药给其他玩家"""
         target_id = None
         item_name = None
         count = 1
@@ -224,25 +225,16 @@ class StorageRingHandler:
                 f"请指定赠予对象\n"
                 f"用法：{CMD_GIFT_ITEM} @某人 物品名 [数量]\n"
                 f"或：{CMD_GIFT_ITEM} QQ号 物品名 [数量]\n"
-                f"示例：{CMD_GIFT_ITEM} 123456789 精铁 5"
+                f"示例：{CMD_GIFT_ITEM} 123456789 筑基丹 3"
             )
             return
 
         if not item_name:
-            yield event.plain_result("请指定要赠予的物品名称")
+            yield event.plain_result("请指定要赠予的物品或丹药名称")
             return
 
         if count <= 0:
             yield event.plain_result("数量必须大于0")
-            return
-
-        # 检查物品是否在储物戒中
-        if not self.storage_ring_manager.has_item(player, item_name, count):
-            current = self.storage_ring_manager.get_item_count(player, item_name)
-            if current == 0:
-                yield event.plain_result(f"储物戒中没有【{item_name}】")
-            else:
-                yield event.plain_result(f"储物戒中【{item_name}】数量不足（当前：{current}个）")
             return
 
         target_player = await self.db.get_player_by_id(target_id)
@@ -252,6 +244,61 @@ class StorageRingHandler:
 
         if target_id == player.user_id:
             yield event.plain_result("不能赠予物品给自己")
+            return
+
+        # 判断是丹药还是储物戒物品
+        is_pill = self.config_manager.is_pill(item_name) if self.config_manager else False
+
+        if is_pill:
+            # ---- 丹药赠予流程 ----
+            if not self.pill_manager:
+                yield event.plain_result("丹药系统暂不可用")
+                return
+
+            # 检查丹药背包中是否有该丹药
+            pill_inv = player.get_pills_inventory()
+            if item_name not in pill_inv or pill_inv[item_name] < count:
+                current = pill_inv.get(item_name, 0)
+                if current == 0:
+                    yield event.plain_result(f"丹药背包中没有【{item_name}】")
+                else:
+                    yield event.plain_result(f"丹药背包中【{item_name}】数量不足（当前：{current}个）")
+                return
+
+            # 从丹药背包扣除
+            success, msg = await self.pill_manager.remove_pill_from_inventory(player, item_name, count)
+            if not success:
+                yield event.plain_result(f"赠予失败：{msg}")
+                return
+
+            # 创建待处理赠予请求
+            sender_name = event.get_sender_name()
+            await self.db.ext.create_pending_gift(
+                receiver_id=target_id,
+                sender_id=player.user_id,
+                sender_name=sender_name,
+                item_name=item_name,
+                count=count,
+                expires_hours=24,
+                gift_type="pill"
+            )
+
+            yield event.plain_result(
+                f"💊 赠丹请求已发送！\n"
+                f"【{item_name}】x{count} → @{target_id}\n"
+                f"等待对方确认...（24小时内有效）\n"
+                f"对方可使用 {CMD_ACCEPT_GIFT} 接收或 {CMD_REJECT_GIFT} 拒绝"
+            )
+            return
+
+        # ---- 储物戒物品赠予流程 ----
+        # 检查物品是否在储物戒中
+        if not self.storage_ring_manager.has_item(player, item_name, count):
+            current = self.storage_ring_manager.get_item_count(player, item_name)
+            if current == 0:
+                yield event.plain_result(f"储物戒中没有【{item_name}】")
+            else:
+                yield event.plain_result(f"储物戒中【{item_name}】数量不足（当前：{current}个）")
             return
 
         # 先从储物戒中取出物品
@@ -268,7 +315,7 @@ class StorageRingHandler:
             sender_name=sender_name,
             item_name=item_name,
             count=count,
-            expires_hours=24  # 24小时后过期
+            expires_hours=24
         )
 
         yield event.plain_result(
@@ -280,7 +327,7 @@ class StorageRingHandler:
 
     @player_required
     async def handle_accept_gift(self, player: Player, event: AstrMessageEvent):
-        """接收赠予的物品"""
+        """接收赠予的物品/丹药"""
         user_id = player.user_id
 
         # 从数据库获取待处理的赠予请求
@@ -293,34 +340,46 @@ class StorageRingHandler:
         count = gift["count"]
         sender_name = gift["sender_name"]
         gift_id = gift["id"]
+        gift_type = gift.get("gift_type", "item")
 
-        # 尝试存入接收者的储物戒
-        success, message = await self.storage_ring_manager.store_item(player, item_name, count)
+        if gift_type == "pill":
+            # ---- 接收丹药 ----
+            if not self.pill_manager:
+                yield event.plain_result("丹药系统暂不可用")
+                return
 
-        if success:
-            # 删除数据库中的赠予请求
+            await self.pill_manager.add_pill_to_inventory(player, item_name, count)
             await self.db.ext.delete_pending_gift(gift_id)
             yield event.plain_result(
-                f"✅ 已接收来自【{sender_name}】的赠予！\n"
+                f"✅ 已接收来自【{sender_name}】的赠丹！\n"
                 f"获得：【{item_name}】x{count}"
             )
         else:
-            # 存入失败，物品返还给发送者
-            sender_id = gift["sender_id"]
-            sender_player = await self.db.get_player_by_id(sender_id)
-            if sender_player:
-                await self.storage_ring_manager.store_item(sender_player, item_name, count, silent=True)
+            # ---- 接收储物戒物品 ----
+            success, message = await self.storage_ring_manager.store_item(player, item_name, count)
 
-            # 删除数据库中的赠予请求
-            await self.db.ext.delete_pending_gift(gift_id)
-            yield event.plain_result(
-                f"❌ 接收失败：{message}\n"
-                f"物品已返还给【{sender_name}】"
-            )
+            if success:
+                await self.db.ext.delete_pending_gift(gift_id)
+                yield event.plain_result(
+                    f"✅ 已接收来自【{sender_name}】的赠予！\n"
+                    f"获得：【{item_name}】x{count}"
+                )
+            else:
+                # 存入失败，物品返还给发送者
+                sender_id = gift["sender_id"]
+                sender_player = await self.db.get_player_by_id(sender_id)
+                if sender_player:
+                    await self.storage_ring_manager.store_item(sender_player, item_name, count, silent=True)
+
+                await self.db.ext.delete_pending_gift(gift_id)
+                yield event.plain_result(
+                    f"❌ 接收失败：{message}\n"
+                    f"物品已返还给【{sender_name}】"
+                )
 
     @player_required
     async def handle_reject_gift(self, player: Player, event: AstrMessageEvent):
-        """拒绝赠予的物品"""
+        """拒绝赠予的物品/丹药"""
         user_id = player.user_id
 
         # 从数据库获取待处理的赠予请求
@@ -334,11 +393,17 @@ class StorageRingHandler:
         sender_id = gift["sender_id"]
         sender_name = gift["sender_name"]
         gift_id = gift["id"]
+        gift_type = gift.get("gift_type", "item")
 
-        # 物品返还给发送者
         sender_player = await self.db.get_player_by_id(sender_id)
-        if sender_player:
-            await self.storage_ring_manager.store_item(sender_player, item_name, count, silent=True)
+        if gift_type == "pill":
+            # ---- 返还丹药到发送者丹药背包 ----
+            if sender_player and self.pill_manager:
+                await self.pill_manager.add_pill_to_inventory(sender_player, item_name, count)
+        else:
+            # ---- 返还物品到发送者储物戒 ----
+            if sender_player:
+                await self.storage_ring_manager.store_item(sender_player, item_name, count, silent=True)
 
         # 删除数据库中的赠予请求
         await self.db.ext.delete_pending_gift(gift_id)

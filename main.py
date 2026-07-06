@@ -193,7 +193,7 @@ class XiuXianPlugin(Star):
         self.breakthrough_handler = BreakthroughHandler(self.db, self.config_manager, self.config)
         self.pill_handler = PillHandler(self.db, self.config_manager)
         self.shop_handler = ShopHandler(self.db, self.config, self.config_manager)
-        self.storage_ring_handler = StorageRingHandler(self.db, self.config_manager)
+        self.storage_ring_handler = StorageRingHandler(self.db, self.config_manager, self.pill_handler.pill_manager)
         
         # 初始化核心管理器
         from .core import StorageRingManager

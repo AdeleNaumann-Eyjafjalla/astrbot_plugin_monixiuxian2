@@ -217,40 +217,69 @@ class EquipmentManager:
         # 根据物品类型装备到相应位置
         if item.item_type == "weapon":
             old_item = player.weapon
-            # 先尝试将旧装备存入储物戒，再更新玩家装备
             storage_msg = ""
             if old_item:
-                success, store_msg = await self.storage_ring_manager.store_item(player, old_item, 1, silent=True) if self.storage_ring_manager else (True, "")
+                # 先通过 store_item 将旧装备存入储物戒（该方法自行管理事务并同步 DB）
+                success, store_msg = await self.storage_ring_manager.store_item(
+                    player, old_item, 1, silent=True
+                ) if self.storage_ring_manager else (True, "")
                 if not success:
                     return False, f"储物戒空间不足，无法替换装备！\n旧装备【{old_item}】存入失败：{store_msg}"
                 storage_msg = f"\n旧装备【{old_item}】已存入储物戒"
-            player.weapon = item.name
-            await self.db.update_player(player)
-            return True, f"已将【{old_item or '空'}】替换为【{item.name}】（{item.rank}）{storage_msg}" if old_item else f"已装备武器【{item.name}】（{item.rank}）"
+                # store_item 内部已更新 DB 中的储物数据，但 player 内存中的 storage_ring_items 仍是旧快照
+                # 需要手动同步，避免后续 update_player 用旧快照覆盖 DB
+                items = dict(player.storage_ring_items)
+                items[old_item] = items.get(old_item, 0) + 1
+                player.storage_ring_items = items
+                player.weapon = item.name
+                await self.db.update_player(player)
+                return True, f"已将武器【{old_item}】替换为【{item.name}】（{item.rank}）{storage_msg}"
+            else:
+                player.weapon = item.name
+                await self.db.update_player(player)
+                return True, f"已装备武器【{item.name}】（{item.rank}）"
 
         elif item.item_type == "armor":
             old_item = player.armor
             storage_msg = ""
             if old_item:
-                success, store_msg = await self.storage_ring_manager.store_item(player, old_item, 1, silent=True) if self.storage_ring_manager else (True, "")
+                success, store_msg = await self.storage_ring_manager.store_item(
+                    player, old_item, 1, silent=True
+                ) if self.storage_ring_manager else (True, "")
                 if not success:
                     return False, f"储物戒空间不足，无法替换装备！\n旧装备【{old_item}】存入失败：{store_msg}"
                 storage_msg = f"\n旧装备【{old_item}】已存入储物戒"
-            player.armor = item.name
-            await self.db.update_player(player)
-            return True, f"已将【{old_item or '空'}】替换为【{item.name}】（{item.rank}）{storage_msg}" if old_item else f"已装备防具【{item.name}】（{item.rank}）"
+                items = dict(player.storage_ring_items)
+                items[old_item] = items.get(old_item, 0) + 1
+                player.storage_ring_items = items
+                player.armor = item.name
+                await self.db.update_player(player)
+                return True, f"已将防具【{old_item}】替换为【{item.name}】（{item.rank}）{storage_msg}"
+            else:
+                player.armor = item.name
+                await self.db.update_player(player)
+                return True, f"已装备防具【{item.name}】（{item.rank}）"
 
         elif item.item_type == "main_technique":
             old_item = player.main_technique
             storage_msg = ""
             if old_item:
-                success, store_msg = await self.storage_ring_manager.store_item(player, old_item, 1, silent=True) if self.storage_ring_manager else (True, "")
+                success, store_msg = await self.storage_ring_manager.store_item(
+                    player, old_item, 1, silent=True
+                ) if self.storage_ring_manager else (True, "")
                 if not success:
                     return False, f"储物戒空间不足，无法替换装备！\n旧装备【{old_item}】存入失败：{store_msg}"
                 storage_msg = f"\n旧装备【{old_item}】已存入储物戒"
-            player.main_technique = item.name
-            await self.db.update_player(player)
-            return True, f"已将主修心法【{old_item or '空'}】替换为【{item.name}】（{item.rank}）{storage_msg}" if old_item else f"已装备主修心法【{item.name}】（{item.rank}）"
+                items = dict(player.storage_ring_items)
+                items[old_item] = items.get(old_item, 0) + 1
+                player.storage_ring_items = items
+                player.main_technique = item.name
+                await self.db.update_player(player)
+                return True, f"已将主修心法【{old_item}】替换为【{item.name}】（{item.rank}）{storage_msg}"
+            else:
+                player.main_technique = item.name
+                await self.db.update_player(player)
+                return True, f"已装备主修心法【{item.name}】（{item.rank}）"
 
         elif item.item_type == "technique":
             techniques_list = player.get_techniques_list()

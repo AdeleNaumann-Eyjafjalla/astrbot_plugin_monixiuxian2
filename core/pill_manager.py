@@ -722,6 +722,32 @@ class PillManager:
         player.set_pills_inventory(inventory)
         await self.db.update_player(player)
 
+    async def remove_pill_from_inventory(self, player: Player, pill_name: str, count: int = 1) -> tuple[bool, str]:
+        """从丹药背包移除指定数量的丹药
+
+        Args:
+            player: 玩家对象
+            pill_name: 丹药名称
+            count: 移除数量
+
+        Returns:
+            (是否成功, 消息)
+        """
+        inventory = player.get_pills_inventory()
+        if pill_name not in inventory:
+            return False, f"丹药背包中没有【{pill_name}】"
+        
+        current = inventory[pill_name]
+        if count > current:
+            return False, f"丹药背包中【{pill_name}】数量不足（当前：{current}个）"
+        
+        inventory[pill_name] -= count
+        if inventory[pill_name] <= 0:
+            del inventory[pill_name]
+        player.set_pills_inventory(inventory)
+        await self.db.update_player(player)
+        return True, f"已从丹药背包移除【{pill_name}】x{count}"
+
     def get_pill_inventory_display(self, player: Player) -> str:
         """获取丹药背包显示文本
 

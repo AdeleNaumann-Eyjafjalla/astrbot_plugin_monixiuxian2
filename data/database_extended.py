@@ -613,7 +613,8 @@ class DatabaseExtended:
     # ===== 赠予请求系统 CRUD =====
     
     async def create_pending_gift(self, receiver_id: str, sender_id: str, sender_name: str,
-                                   item_name: str, count: int, expires_hours: int = 24) -> int:
+                                   item_name: str, count: int, expires_hours: int = 24,
+                                   gift_type: str = "item") -> int:
         """创建赠予请求
         
         Args:
@@ -623,6 +624,7 @@ class DatabaseExtended:
             item_name: 物品名称
             count: 物品数量
             expires_hours: 过期时间（小时），默认24小时
+            gift_type: 赠予类型，"item"（储物戒物品）或 "pill"（丹药）
             
         Returns:
             新创建的赠予请求ID
@@ -634,10 +636,10 @@ class DatabaseExtended:
         await self.conn.execute(
             """
             INSERT INTO pending_gifts (
-                receiver_id, sender_id, sender_name, item_name, count, created_at, expires_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?)
+                receiver_id, sender_id, sender_name, item_name, count, created_at, expires_at, gift_type
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
             """,
-            (receiver_id, sender_id, sender_name, item_name, count, now, expires_at)
+            (receiver_id, sender_id, sender_name, item_name, count, now, expires_at, gift_type)
         )
         await self.conn.commit()
         
@@ -655,7 +657,7 @@ class DatabaseExtended:
         
         async with self.conn.execute(
             """
-            SELECT id, receiver_id, sender_id, sender_name, item_name, count, created_at, expires_at
+            SELECT id, receiver_id, sender_id, sender_name, item_name, count, created_at, expires_at, gift_type
             FROM pending_gifts 
             WHERE receiver_id = ? AND expires_at > ?
             ORDER BY created_at DESC 
@@ -673,7 +675,8 @@ class DatabaseExtended:
                     "item_name": row[4],
                     "count": row[5],
                     "created_at": row[6],
-                    "expires_at": row[7]
+                    "expires_at": row[7],
+                    "gift_type": row[8] if len(row) > 8 else "item"
                 }
             return None
     
@@ -684,7 +687,7 @@ class DatabaseExtended:
         
         async with self.conn.execute(
             """
-            SELECT id, receiver_id, sender_id, sender_name, item_name, count, created_at, expires_at
+            SELECT id, receiver_id, sender_id, sender_name, item_name, count, created_at, expires_at, gift_type
             FROM pending_gifts 
             WHERE receiver_id = ? AND expires_at > ?
             ORDER BY created_at DESC
@@ -701,7 +704,8 @@ class DatabaseExtended:
                     "item_name": row[4],
                     "count": row[5],
                     "created_at": row[6],
-                    "expires_at": row[7]
+                    "expires_at": row[7],
+                    "gift_type": row[8] if len(row) > 8 else "item"
                 }
                 for row in rows
             ]

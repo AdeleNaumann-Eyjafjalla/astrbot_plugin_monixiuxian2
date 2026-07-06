@@ -1191,3 +1191,23 @@ async def _migrate_to_v23(conn: aiosqlite.Connection, config_manager: ConfigMana
         f"v23迁移完成：已更新 {stats['players_updated']} 个玩家、"
         f"{stats['gifts_renamed']} 条赠予请求"
     )
+
+
+@migration(24)
+async def _migrate_to_v24(conn: aiosqlite.Connection, config_manager: ConfigManager):
+    """迁移到v24 - pending_gifts 添加 gift_type 字段以支持丹药赠予"""
+    logger.info("开始迁移到v24：pending_gifts 添加 gift_type 字段")
+
+    # 检查列是否已存在
+    async with conn.execute("PRAGMA table_info(pending_gifts)") as cursor:
+        columns = await cursor.fetchall()
+    column_names = [col[1] for col in columns]
+
+    if "gift_type" not in column_names:
+        await conn.execute("ALTER TABLE pending_gifts ADD COLUMN gift_type TEXT NOT NULL DEFAULT 'item'")
+        logger.info("已添加 gift_type 列到 pending_gifts 表")
+    else:
+        logger.info("gift_type 列已存在，跳过")
+
+    await conn.commit()
+    logger.info("v24迁移完成：pending_gifts 支持丹药赠予")

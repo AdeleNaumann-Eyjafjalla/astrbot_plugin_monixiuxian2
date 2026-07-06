@@ -91,12 +91,36 @@ class EquipmentHandler:
 
     @player_required
     async def handle_equip_item(self, player: Player, event: AstrMessageEvent, item_name: str):
-        """装备物品"""
+        """装备物品
+        支持语法：
+          - 装备 物品名              → 自动判断槽位
+          - 装备 主修 功法名         → 指定装备为主修心法
+        """
         if not item_name or item_name.strip() == "":
-            yield event.plain_result(f"请指定要装备的物品名称\n用法：{CMD_EQUIP_ITEM} 物品名称")
+            yield event.plain_result(
+                f"请指定要装备的物品名称\n"
+                f"用法：{CMD_EQUIP_ITEM} 物品名称\n"
+                f"用法：{CMD_EQUIP_ITEM} 主修 功法名称"
+            )
             return
 
         item_name = item_name.strip()
+
+        # 检测「主修」前缀
+        as_main_technique = False
+        if item_name.startswith("主修 ") or item_name.startswith("主修"):
+            if item_name == "主修":
+                yield event.plain_result(
+                    f"请指定要装备为主修心法的功法名称\n"
+                    f"用法：{CMD_EQUIP_ITEM} 主修 功法名称"
+                )
+                return
+            as_main_technique = True
+            item_name = item_name[2:].strip()  # 去掉"主修"前缀
+
+        if not item_name:
+            yield event.plain_result(f"请指定要装备的物品名称")
+            return
 
         # 检查物品是否存在于配置中（先查items再查weapons）
         item_config = self.config_manager.items_data.get(item_name)
@@ -108,21 +132,35 @@ class EquipmentHandler:
             return
 
         # 检查物品类型是否可装备
-        item_type = item_config.get("type", "")
+        raw_item_type = item_config.get("type", "")
         equippable_types = ["weapon", "armor", "main_technique", "technique"]
-        
+
         # 兼容旧格式
-        if item_type == "法器":
+        if raw_item_type == "法器":
             subtype = item_config.get("subtype", "")
             if subtype == "武器":
                 item_type = "weapon"
             elif subtype == "防具":
                 item_type = "armor"
-        elif item_type == "功法":
-            item_type = "technique"
-        
+            else:
+                # 饰品等其他法器暂不支持装备
+                item_type = raw_item_type
+        elif raw_item_type == "功法":
+            # 「装备 主修 xxx」→ 装备为主修心法
+            if as_main_technique:
+                item_type = "main_technique"
+            else:
+                item_type = "technique"
+        else:
+            item_type = raw_item_type
+
         if item_type not in equippable_types:
             yield event.plain_result(f"【{item_name}】不是可装备的物品类型")
+            return
+
+        # 如果用户指定「主修」但物品不是功法，提示错误
+        if as_main_technique and raw_item_type != "功法":
+            yield event.plain_result(f"【{item_name}】是{raw_item_type}，不能作为主修心法装备")
             return
 
         # 检查储物戒中是否有该物品
@@ -139,24 +177,20 @@ class EquipmentHandler:
             yield event.plain_result(f"❌ 无法从储物戒取出装备：{retrieve_msg}")
             return
 
-        # 创建Item对象
-        from ..models import Item
-        item = Item(
-            item_id=item_config.get("id", item_name),
-            name=item_name,
-            item_type=item_type,
-            description=item_config.get("description", ""),
-            rank=item_config.get("rank", ""),
-            required_level_index=item_config.get("required_level_index", 0),
-            weapon_category=item_config.get("weapon_category", ""),
-            magic_damage=item_config.get("magic_damage", 0),
-            physical_damage=item_config.get("physical_damage", 0),
-            magic_defense=item_config.get("magic_defense", 0),
-            physical_defense=item_config.get("physical_defense", 0),
-            mental_power=item_config.get("mental_power", 0),
-            exp_multiplier=item_config.get("exp_multiplier", 0.0),
-            spiritual_qi=item_config.get("spiritual_qi", 0)
+        # 使用 equipment_manager 的 parse_item_from_name 创建 Item 对象
+        # （确保旧格式 equip_effects 兼容映射、强化等级等正确应用）
+        item = self.equipment_manager.parse_item_from_name(
+            item_name,
+            self.config_manager.items_data,
+            self.config_manager.weapons_data,
+            enhance_level=0
         )
+        if not item:
+            yield event.plain_result(f"无法解析物品：{item_name}")
+            return
+
+        # 覆盖类型为 handler 判断的结果（parse_item_from_name 可能有默认映射差异）
+        item.item_type = item_type
 
         # 装备物品
         success, message = await self.equipment_manager.equip_item(player, item)
