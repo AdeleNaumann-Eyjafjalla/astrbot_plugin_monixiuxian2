@@ -7,7 +7,7 @@ from typing import Dict, Callable, Awaitable
 from astrbot.api import logger
 from ..config_manager import ConfigManager
 
-LATEST_DB_VERSION = 23  # v23: 物品/装备/丹药名称批量更新（风控敏感词替换）
+LATEST_DB_VERSION = 24  # v24: pending_gifts 添加 gift_type 字段以支持丹药赠予
 
 MIGRATION_TASKS: Dict[int, Callable[[aiosqlite.Connection, ConfigManager], Awaitable[None]]] = {}
 
@@ -475,7 +475,8 @@ async def _create_all_tables_v2(conn: aiosqlite.Connection):
             item_name TEXT NOT NULL,
             count INTEGER NOT NULL DEFAULT 1,
             created_at INTEGER NOT NULL,
-            expires_at INTEGER NOT NULL
+            expires_at INTEGER NOT NULL,
+            gift_type TEXT NOT NULL DEFAULT 'item'
         )
     """)
     await conn.execute("CREATE INDEX IF NOT EXISTS idx_pending_gifts_receiver ON pending_gifts(receiver_id)")
@@ -829,7 +830,8 @@ async def _migrate_to_v17(conn: aiosqlite.Connection, config_manager: ConfigMana
             item_name TEXT NOT NULL,
             count INTEGER NOT NULL DEFAULT 1,
             created_at INTEGER NOT NULL,
-            expires_at INTEGER NOT NULL
+            expires_at INTEGER NOT NULL,
+            gift_type TEXT NOT NULL DEFAULT 'item'
         )
     """)
     await conn.execute("CREATE INDEX IF NOT EXISTS idx_pending_gifts_receiver ON pending_gifts(receiver_id)")

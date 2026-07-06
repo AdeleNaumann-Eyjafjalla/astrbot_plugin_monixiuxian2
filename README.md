@@ -4,7 +4,7 @@
   <img src="logo.png" alt="模拟修仙" width="200">
 </p>
 
-> **版本:** v3.4.8  
+> **版本:** v3.4.9  
 > **许可证:** AGPL-3.0  
 > **作者:** AdeleNaumann  
 > **基于:** [nonebot_plugin_xiuxian_2](https://github.com/xiuxian-2/nonebot_plugin_xiuxian_2) (部分借鉴与重构)
@@ -314,6 +314,14 @@ astrbot_plugin_monixiuxian2/
 ---
 
 ## 📝 更新日志
+
+### v3.4.9 - 丹药赠予迁移修复
+
+**🛠 BUG 修复**
+
+| 问题 | 修复 |
+|------|------|
+| `LATEST_DB_VERSION` 未同步到 24，导致 v24 迁移（添加 `gift_type` 列）从不执行 | 更新 `LATEST_DB_VERSION` 为 24；同时在 v15/v17 `CREATE TABLE` 加入 `gift_type` 字段保证新安装兼容 |
 
 ### v3.4.8 - 丹药赠予功能
 
